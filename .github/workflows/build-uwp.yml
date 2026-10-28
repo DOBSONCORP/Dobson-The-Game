@@ -1,0 +1,51 @@
+name: Build UWP for Xbox
+
+# Builds the installable .msixbundle on a Windows runner, so no Windows PC
+# is needed locally. Put this repo's contents at the root of a GitHub repo
+# (DobsonGame.sln and .github/ at the top level), then run this workflow
+# from the Actions tab (or push a change under DobsonGame/).
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'DobsonGame/**'
+      - 'DobsonGame.sln'
+      - '.github/workflows/build-uwp.yml'
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Generate tile logos
+        # The logo PNGs are not committed (the upload path carries text
+        # only), so generate them on the runner before the build.
+        run: |
+          python -m pip install pillow
+          python DobsonGame/Assets/generate-logos.py
+
+      - name: Create a test signing certificate
+        shell: powershell
+        run: |
+          $cert = New-SelfSignedCertificate -Type Custom -Subject "CN=DobsonGame" -KeyUsage DigitalSignature -FriendlyName "DobsonGame Test" -CertStoreLocation "Cert:\CurrentUser\My" -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3")
+          New-Item -ItemType Directory -Force -Path AppPackages | Out-Null
+          Export-Certificate -Cert $cert -FilePath "AppPackages\DobsonGame.cer" | Out-Null
+          "THUMBPRINT=$($cert.Thumbprint)" | Out-File -FilePath $env:GITHUB_ENV -Append
+
+      - name: Restore NuGet packages
+        run: msbuild DobsonGame.sln /t:Restore /p:Configuration=Release /p:Platform=x64
+
+      - name: Build the package
+        run: msbuild DobsonGame.sln /t:Rebuild /p:Configuration=Release /p:Platform=x64 /p:AppxBundle=Always /p:AppxBundlePlatforms=x64 /p:UapAppxPackageBuildMode=SideloadOnly /p:AppxPackageDir="$env:GITHUB_WORKSPACE\AppPackages" /p:PackageCertificateThumbprint="$env:THUMBPRINT" /p:AppxPackageSigningEnabled=true
+
+      - name: Upload the Xbox package
+        uses: actions/upload-artifact@v4
+        with:
+          name: DobsonGame-Xbox
+          path: |
+            AppPackages/**/*.msixbundle
+            AppPackages/**/*.cer
