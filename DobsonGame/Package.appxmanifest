@@ -7,9 +7,7 @@
   <Identity
     Name="DobsonGame"
     Publisher="CN=DobsonGame"
-    Version="1.84.0.0">
-    <mp:PhoneIdentity PhoneProductId="1c74c600-94cc-4d0b-bd79-6561e2451404" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
-  </Identity>
+    Version="1.84.0.0" />
   <Properties>
     <DisplayName>DOBSON</DisplayName>
     <PublisherDisplayName>DOBSONCORP</PublisherDisplayName>
