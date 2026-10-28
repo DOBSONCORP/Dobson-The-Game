@@ -1,0 +1,10 @@
+<!--
+  Runtime directives for .NET Native (Release builds). The default template
+  content is sufficient for this app: it has no reflection-heavy libraries
+  beyond the UWP framework itself.
+-->
+<Directives xmlns="http://schemas.microsoft.com/netfx/2013/01/metadata">
+  <Application>
+    <Assembly Name="*Application*" Dynamic="Required All" />
+  </Application>
+</Directives>

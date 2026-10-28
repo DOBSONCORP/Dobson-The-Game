@@ -1,0 +1,9 @@
+# Build outputs
+Bin/
+obj/
+AppPackages/
+# Signing certs: the build creates its own test cert; never commit a private key.
+*.pfx
+# Visual Studio user files
+.vs/
+*.user

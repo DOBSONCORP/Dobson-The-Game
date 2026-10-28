@@ -1,0 +1,19 @@
+<Page
+    x:Class="DobsonGame.MainPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:DobsonGame"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <!-- The page holds nothing but the WebView on purpose: with no other
+         focusable XAML controls, the Xbox controller's input goes to the
+         game (Gamepad API / keyboard) instead of XAML focus navigation. -->
+    <Grid>
+        <WebView x:Name="GameView"
+                 HorizontalAlignment="Stretch"
+                 VerticalAlignment="Stretch" />
+    </Grid>
+</Page>
