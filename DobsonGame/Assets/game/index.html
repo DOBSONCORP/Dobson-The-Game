@@ -1208,7 +1208,7 @@ addEventListener('touchstart',()=>document.body.classList.add('touch'),{once:tru
    Works with Bluetooth gamepads on desktop and Android: left stick /
    D-pad to move, A (button 0) to jump, Start (button 9) to advance. */
 const pad={left:false,right:false};
-let padAWas=false, padStartWas=false, padBWas=false, padXWas=false, padConnected=false, padAnyWas=false;
+let padAWas=false, padStartWas=false, padRTWas=false, padRBWas=false, padConnected=false, padAnyWas=false;
 let titleSel=0, padNavCooldown=0; // controller level-select cursor
 let menuSel=0, menuMode='main', settingsSound=true, settingsShake=true;
 let dialogue=null, bossDialogueDone=false;
@@ -1236,15 +1236,19 @@ function pollPad(){
     else advance();
   }
   padStartWas=st;
-  const btnB=b(1);
-  if(btnB&&!padBWas&&state==='play') throwTwinkie();
-  padBWas=btnB;
-  const btnX=b(2);
-  if(btnX&&!padXWas&&state==='play') throwGreen();
-  padXWas=btnX;
+  // Xbox-only: B is the system Back button (it exits to the Xbox menu) so
+  // throws move off the face buttons: RT = regular Twinkie, RB = green.
+  // RT is an analog trigger, so use its value with a 0.5 threshold.
+  const trig=i=>gp.buttons[i]&&gp.buttons[i].value>0.5;
+  const btnRT=trig(7);
+  if(btnRT&&!padRTWas&&state==='play') throwTwinkie();
+  padRTWas=btnRT;
+  const btnRB=b(5);
+  if(btnRB&&!padRBWas&&state==='play') throwGreen();
+  padRBWas=btnRB;
   // any button advances in menu states (title/clear/over/win/dialogue)
   let anyPressed=false;
-  for(let bi=0;bi<17;bi++){ if((bi===14||bi===15)&&state==='title'&&menuMode==='scores') continue; if(b(bi)){ anyPressed=true; break; } }
+  for(let bi=0;bi<17;bi++){ if((bi===14||bi===15)&&state==='title'&&menuMode==='scores') continue; if((bi===12||bi===13)&&state==='title'&&menuMode==='main') continue; if(b(bi)){ anyPressed=true; break; } }
   if(anyPressed&&!padAnyWas&&state!=='play') advance();
   padAnyWas=anyPressed;
   // hide touch buttons when a physical controller is connected
@@ -2541,7 +2545,7 @@ function drawTitle(){
     ctx.fillText('GAMEPAD:',220,378);
     ctx.font='15px Impact,"Arial Black",sans-serif'; ctx.fillStyle='#bfdbfe';
     ctx.fillText('D-pad / Stick — Move   •   A — Jump',240,406);
-    ctx.fillText('B — Throw Twinkie   •   X — Throw GREEN',240,430);
+    ctx.fillText('RT — Throw Twinkie   •   RB — Throw GREEN',240,430);
     ctx.fillText('Any button — Advance menus / dialogue',240,454);
     ctx.fillText('Keyboard: Arrows/WASD move, Space jump,',240,478);
     ctx.fillText('X throw, C green throw (costs 1 Twinkie + 1 Score)',240,500);

@@ -15,6 +15,10 @@ namespace DobsonGame
             this.Loaded += MainPage_Loaded;
             GameView.NavigationCompleted += GameView_NavigationCompleted;
             GameView.NewWindowRequested += GameView_NewWindowRequested;
+            // Xbox: B is the system Back button. Swallow the system-level Back
+            // request so pressing B never kicks the player to the Xbox menu;
+            // the game itself reads the controller through the Gamepad API.
+            SystemNavigationManager.GetForCurrentView().BackRequested += (s, e) => { e.Handled = true; };
         }
 
         private void MainPage_Loaded(object sender, RoutedEventArgs e)

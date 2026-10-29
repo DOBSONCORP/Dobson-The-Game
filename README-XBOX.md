@@ -98,6 +98,14 @@ with plain if-guards (same behaviour, no version change). If a future
 game version reintroduces `?.`, re-apply the same replacement to the
 Xbox copy before building, or the Xbox build will break again.
 
+**Xbox controller note (2026-10-28):** the Xbox copy also remaps the
+controller: RT throws a Twinkie, RB throws a green Twinkie (the main
+game uses B/X), D-pad up/down on the title menu no longer also
+activates the selection, and the app shell swallows the system Back
+request so B never kicks the player to the Xbox menu mid-game. If a
+future game version replaces `DobsonGame/Assets/game/index.html`,
+re-apply both the EdgeHTML and the controller patches to the new copy.
+
 ## Notes and limits (honest ones)
 
 - This is a UWP **WebView wrapper**, not a native Xbox GDK game. That's
