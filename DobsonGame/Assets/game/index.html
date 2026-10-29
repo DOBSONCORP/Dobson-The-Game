@@ -1183,7 +1183,7 @@ function bindBtn(id,down,up,latchMs){
     clearHold:()=>{ if(timer||cancelHeld){ clearTimers(); cancelHeld=false; up(); } },
     forceClear:()=>{ clearTimers(); cancelHeld=false; up(); }
   };
-  const on=e=>{ const first=held.size===0; held.add(e.pointerId); try{ el.setPointerCapture(e.pointerId); }catch(_){} if(!first) return; if(timer){ clearTimeout(timer); timer=null; } if(capTimer){ clearTimeout(capTimer); capTimer=null; } cancelHeld=false; if(id==='btnL') btnCtl['btnR']?.clearHold(); if(id==='btnR') btnCtl['btnL']?.clearHold(); e.preventDefault(); audio(); if(state==='dialogue'){ advanceDialogue(); if(id==='btnL'||id==='btnR') down(); return; } down(); };
+  const on=e=>{ const first=held.size===0; held.add(e.pointerId); try{ el.setPointerCapture(e.pointerId); }catch(_){} if(!first) return; if(timer){ clearTimeout(timer); timer=null; } if(capTimer){ clearTimeout(capTimer); capTimer=null; } cancelHeld=false; if(id==='btnL'&&btnCtl['btnR']) btnCtl['btnR'].clearHold(); if(id==='btnR'&&btnCtl['btnL']) btnCtl['btnL'].clearHold(); e.preventDefault(); audio(); if(state==='dialogue'){ advanceDialogue(); if(id==='btnL'||id==='btnR') down(); return; } down(); };
   const offUp=e=>{ if(!held.has(e.pointerId)) return; held.delete(e.pointerId); if(held.size>0) return; e.preventDefault(); if(latchMs){ timer=setTimeout(()=>{ timer=null; up(); },latchMs); } else up(); };
   const offCancel=e=>{ if(!held.has(e.pointerId)) return; held.delete(e.pointerId); if(held.size>0) return; e.preventDefault(); cancelHeld=true; if(capTimer) clearTimeout(capTimer); capTimer=setTimeout(()=>{ capTimer=null; if(cancelHeld){ cancelHeld=false; up(); } },5000); };
   el.addEventListener('pointerdown',on);
@@ -1191,8 +1191,8 @@ function bindBtn(id,down,up,latchMs){
   el.addEventListener('pointercancel',offCancel);
   el.addEventListener('lostpointercapture',offCancel);
 }
-function clearStaleHolds(){ for(const k in btnCtl) btnCtl[k].clearHold?.(); }
-function clearAllInputs(){ for(const k in btnCtl) btnCtl[k].forceClear?.(); }
+function clearStaleHolds(){ for(const k in btnCtl) if(btnCtl[k].clearHold) btnCtl[k].clearHold(); }
+function clearAllInputs(){ for(const k in btnCtl) if(btnCtl[k].forceClear) btnCtl[k].forceClear(); }
 bindBtn('btnL',()=>input.left=true,()=>input.left=false,150);
 bindBtn('btnR',()=>input.right=true,()=>input.right=false,150);
 bindBtn('btnJ',()=>{ jumpQueued=true; },()=>{ if(state==='play'&&player&&player.vy<-5) player.vy=-5; });

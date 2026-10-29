@@ -90,6 +90,14 @@ Alternative from a Windows PC with the Windows SDK installed:
    Updating this way keeps the app's saved data, so high scores,
    unlocked levels and audio settings carry over.
 
+**Xbox WebView note (2026-10-28):** the Xbox app runs the older EdgeHTML
+browser, which cannot parse `?.` optional chaining — that was why the
+first install showed only a dark screen. The copy of the game in
+`DobsonGame/Assets/game/index.html` has those 4 expressions replaced
+with plain if-guards (same behaviour, no version change). If a future
+game version reintroduces `?.`, re-apply the same replacement to the
+Xbox copy before building, or the Xbox build will break again.
+
 ## Notes and limits (honest ones)
 
 - This is a UWP **WebView wrapper**, not a native Xbox GDK game. That's
