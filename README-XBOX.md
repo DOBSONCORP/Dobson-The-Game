@@ -106,6 +106,16 @@ request so B never kicks the player to the Xbox menu mid-game. If a
 future game version replaces `DobsonGame/Assets/game/index.html`,
 re-apply both the EdgeHTML and the controller patches to the new copy.
 
+**Couples Therapy on Xbox (v85):** the Xbox build includes the new
+Couples Therapy mode from the main menu. Connect a second controller
+and the battle starts automatically — two players on one TV, no split
+screen: the camera follows the midpoint between Mr. Dobson and
+Mrs. Dobson and zooms out as they separate. Move: stick / D-pad,
+Jump: A, Throw: RT, Quit: B. Best of 3 rounds; only thrown Twinkies
+damage the other player (spikes only knock you back, falling in a gap
+just respawns you). The packaged manifest is still 1.84.0.0, so
+install the v85 bundle after uninstalling the old Xbox app.
+
 ## Notes and limits (honest ones)
 
 - This is a UWP **WebView wrapper**, not a native Xbox GDK game. That's

@@ -28,6 +28,7 @@
   #btnL { left:48px; } #btnR { left:138px; } #btnJ { right:18px; width:88px; height:88px; font-size:26px; }
   #btnT { right:120px; bottom:48px; width:64px; height:64px; font-size:28px; }
   #btnG { right:196px; bottom:48px; width:64px; height:64px; font-size:28px; }
+  body.battle #btnG, body.battle #btnP{ display:none !important; }
   #btnP { top:calc(64px + env(safe-area-inset-top)); right:18px; bottom:auto; width:56px; height:56px; font-size:20px; }
   #rotateTip { position:fixed; inset:0; display:none; align-items:center; justify-content:center;
     background:rgba(5,12,28,.92); color:#fff; z-index:20; text-align:center; padding:24px; font-size:20px; line-height:1.5; }
@@ -46,6 +47,7 @@
   <div class="tbtn" id="btnJ"><img class="ticon" style="width:48px;height:auto;" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAADAAAABACAYAAABcIPRGAAAA0klEQVR4nO3XQQrCMBBAUauewp2HceMVPJ9XEMG7WHDhLUS32oJDTPBn4L9dRamfTGgzLCrtNqvn+/XpuP36/f1h/Li+3B9Dzf2XNT/ugQG04vkrnflI7Z5IvwIG0MJ5az3zkdI9kX4FDKDN5uvfMx+J9kT6FTCANvQ285Hpnki/AgbQwudApPV5IOJzoDfpA9bTD6L379I9UsozcTYG0AygGUAzgGYAzQCaATQDaOkDZmfiUtfzrcX/+Fn6FTCAZgDNAJoBNANoBtAMoBlAM4D2AnSTMPfHQHPsAAAAAElFTkSuQmCC" alt="" /></div>
   <div class="tbtn" id="btnP"><img class="ticon" style="width:40px;height:auto;" src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAYAAACqaXHeAAAA1ElEQVR4nO3bsalCQRQAUf1ahdkvxsQWrM8WRLAXBQO7EI01kQ30gG8me/CWOwx7w53NImLKzEcPrFeL+8j/x+tteMY35/2N6fweBdACmrf78rqD+93/0IDN9vz0/W5Hvz1v8jegAFpAUwAtoCmAFtAUQAtoCqAFNAXQApoCaAFNAbSApgBaQFMALaApgBbQFEALaAqgBTQF0AKaAmgBTQG0gKYAWkCzHD1wOlw+4cHmTf4GFEALaAqgBTQF0AKaAmgBTQG0gKY3Q2M6v0cBtEBEhOQBqQgjYMmk7NcAAAAASUVORK5CYII=" alt="" /></div>
   <input id="initialsInput" maxlength="3" placeholder="AAA" style="display:none;position:absolute;left:50%;top:60%;transform:translate(-50%,-50%);font-size:32px;font-family:Impact,sans-serif;text-align:center;width:120px;background:rgba(5,12,28,0.9);color:#fff;border:2px solid #fbbf24;border-radius:8px;padding:8px;text-transform:uppercase;z-index:100;" />
+  <input id="battleCodeInput" maxlength="4" placeholder="CODE" style="display:none;position:absolute;font-size:28px;font-family:Impact,sans-serif;text-align:center;background:rgba(5,12,28,0.9);color:#fbbf24;border:2px solid #fbbf24;border-radius:8px;padding:6px;text-transform:uppercase;z-index:100;" />
 </div>
 <div id="rotateTip"><div style="font-family:Impact,'Arial Black',sans-serif;letter-spacing:1px;">ROTATE YOUR DEVICE<br>TO LANDSCAPE TO PLAY!</div></div>
 <script>
@@ -159,7 +161,7 @@ document.getElementById('touch').addEventListener('contextmenu',e=>e.preventDefa
 // gesture at the touch layer stops it from ever starting.
 for(const ev of ['touchstart','touchmove']) document.getElementById('touch').addEventListener(ev,e=>e.preventDefault(),{passive:false});
 const W = 960, H = 540, TILE = 40, ROWS = 13;
-const GAME_VERSION='v84';
+const GAME_VERSION='v85';
 const GRAV = 0.62, MOVE_SPD = 3.4, JUMP_V = -13.2, MAX_FALL = 12;
 
 /* ---------------- utils ---------------- */
@@ -698,11 +700,20 @@ function drawIntro(){
     const kimg=IMG.mrsdobson32;
     if(kimg&&kimg.complete&&kimg.naturalWidth>0) ctx.drawImage(kimg, krisX-8, floorY-52, 16, 52);
   }
-  // the Mayor (bottom-aligned to the floor, like the fixed boss draw)
+  // the Mayor (intro only): whole sprite, never the leg-split run cycle —
+  // the scissor cut his narrow legs apart and read as floating/missing legs.
+  // A fixed contact shadow anchors his feet to the floor.
   if(phase!=='dance'){
     const mimg=IMG.mayor, moving=(phase==='enter'||phase==='runoff');
-    if(!drawRunCharacter(mimg, mayX-28, floorY-112, 56, 112, t*0.35, moving, phase==='enter')){
-      if(mimg&&mimg.complete&&mimg.naturalWidth>0) ctx.drawImage(mimg, mayX-28, floorY-112, 56, 112);
+    const mBob=moving?Math.round(Math.abs(Math.sin(t*0.35))*2):0;
+    ctx.fillStyle='rgba(0,0,0,0.28)';
+    if(ctx.ellipse){ ctx.beginPath(); ctx.ellipse(mayX, floorY+2, 26, 5, 0, 0, Math.PI*2); ctx.fill(); }
+    else ctx.fillRect(mayX-26, floorY, 52, 4);
+    if(mimg&&mimg.complete&&mimg.naturalWidth>0){
+      ctx.save();
+      if(phase==='enter'){ ctx.translate(mayX,0); ctx.scale(-1,1); ctx.drawImage(mimg, -28, floorY-112-mBob, 56, 112); }
+      else ctx.drawImage(mimg, mayX-28, floorY-112-mBob, 56, 112);
+      ctx.restore();
     }
   }
   ctx.restore();
@@ -795,6 +806,7 @@ function respawn(){
 
 /* ---------------- Twinkie throwing ---------------- */
 function throwTwinkie(){
+  if(state==='battle'){ battleThrowLocal(); return; }
   if(state!=='play'||!player||throwCooldown>0) return;
   if(ammo<=0){ SFX.click(); floatTexts.push({x:player.x+13,y:player.y-10,txt:'NO TWINKIES!',life:40,color:'#ef4444'}); return; }
   ammo--; score=Math.max(0,score-1);
@@ -888,6 +900,8 @@ function update(){
   titleT+=0.05;
   updateFx();
   pollPad();
+  if(state==='battle'){ updateBattle(); return; }
+  if(state==='battleFind'){ updateBattleFind(); return; }
   if(state==='intro'){
     if(introDlg<0){
       introT++;
@@ -995,7 +1009,7 @@ function update(){
   for(const f of fugglers){
     if(f.taken || (f.secret && !secretRevealed)) continue; f.ph+=0.08;
     if(rectsOverlap(pb,{x:f.x-6,y:f.y-6,w:48,h:48})){
-      f.taken=true; keithsKept.add(f.key); lives=Math.min(5,lives+1); SFX.life(); rumble(0.2,0.8,150);
+      f.taken=true; keithsKept.add(f.key); lives=lives+1; SFX.life(); rumble(0.2,0.8,150);
       burst(f.x+18,f.y+18,'#c4b5fd',16);
     }
   }
@@ -1011,10 +1025,17 @@ function update(){
   for(const c of cosmos){
     if(c.ridden || c.gone) continue;
     if(c.fled){
-      // fled Cosmo runs away horizontally
-      c.x+=c.vx||6; c.anim+=0.15;
-      // remove once off-screen
-      if(c.x<-100||c.x>levelWpx()+100) c.gone=true;
+      // fled Cosmo drops to the ground first, then runs away on the ground
+      // (he used to run horizontally through the sky when hit mid-air)
+      c.vy=Math.min(c.vy+GRAV,MAX_FALL); c.y+=c.vy;
+      if(c.vy>=0){
+        const ty=Math.floor((c.y+c.h)/TILE);
+        const l=Math.floor((c.x+4)/TILE), r=Math.floor((c.x+c.w-4)/TILE);
+        for(let tx=l;tx<=r;tx++) if(isSolid(tx,ty)){ c.y=ty*TILE-c.h; c.vy=0; break; }
+      }
+      if(c.vy===0){ c.x+=c.vx||6; c.anim+=0.15; }
+      // remove once off-screen, or if he fell into a pit
+      if(c.x<-100||c.x>levelWpx()+100||c.y>ROWS*TILE+120) c.gone=true;
       continue;
     }
     c.vy=Math.min(c.vy+GRAV,MAX_FALL); c.y+=c.vy;
@@ -1027,7 +1048,9 @@ function update(){
   // level completes only when the player's CENTER reaches the door
   const pcx=p.x+p.w/2, pcy=p.y+p.h/2;
   for(const d of dens){
-    if(!(pcx>d.x&&pcx<d.x+d.w&&pcy>d.y&&pcy<d.y+d.h)) continue;
+    // smaller hitbox: the player's center must be well inside the door,
+    // not just brushing its edge
+    if(!(pcx>d.x+12&&pcx<d.x+d.w-12&&pcy>d.y+10&&pcy<d.y+d.h-10)) continue;
     // in level 10, must defeat the Mayor first!
     if(levelIndex===9&&boss&&boss.hp>0){
       if(mayorMsgCd<=0){
@@ -1145,6 +1168,10 @@ addEventListener('keydown',e=>{
   if((e.code==='Space'||e.code==='ArrowUp'||e.code==='KeyW')&&!e.repeat) jumpQueued=true;
   if(e.code==='Enter'&&!e.repeat) advance();
   // pause toggle (Esc/P) during gameplay
+  if(e.code==='Escape'&&!e.repeat&&state==='battle'){ quitBattle(); return; }
+  if(e.code==='Escape'&&!e.repeat&&state==='battleFind'){ closeBattleFind(); return; }
+  if(e.code==='Enter'&&!e.repeat&&state==='battle'&&battle&&battle.phase==='matchEnd'){ battleRematch(); return; }
+  if(e.code==='Enter'&&!e.repeat&&state==='battle'&&battle&&battle.phase==='partnerLeft'){ quitBattle(); return; }
   if((e.code==='Escape'||e.code==='KeyP')&&!e.repeat&&state==='play'&&!dialogue){
     paused=!paused; SFX.click();
     if(paused) stopMusic(); else playSong(levelIndex);
@@ -1154,8 +1181,9 @@ addEventListener('keydown',e=>{
     paused=false; SFX.click(); state='title'; menuMode='main'; stopMusic();
   }
   if(state==='title'&&menuMode==='main'&&!e.repeat){
-    if(e.code==='ArrowUp'||e.code==='KeyW'){ menuSel=(menuSel+4)%5; SFX.click(); }
-    if(e.code==='ArrowDown'||e.code==='KeyS'){ menuSel=(menuSel+1)%5; SFX.click(); }
+    const ml=titleMenuItems().length;
+    if(e.code==='ArrowUp'||e.code==='KeyW'){ menuSel=(menuSel+ml-1)%ml; SFX.click(); }
+    if(e.code==='ArrowDown'||e.code==='KeyS'){ menuSel=(menuSel+1)%ml; SFX.click(); }
   }
   if(state==='title'&&menuMode==='scores'&&!e.repeat){
     if(e.code==='ArrowLeft'){ hsTab='points'; SFX.click(); }
@@ -1257,8 +1285,9 @@ function pollPad(){
   if(state==='title'&&menuMode==='main'){
     if(padNavCooldown>0) padNavCooldown--;
     else {
-      if(b(12)){ menuSel=(menuSel+4)%5; padNavCooldown=12; SFX.click(); }
-      else if(b(13)){ menuSel=(menuSel+1)%5; padNavCooldown=12; SFX.click(); }
+      const ml2=titleMenuItems().length;
+      if(b(12)){ menuSel=(menuSel+ml2-1)%ml2; padNavCooldown=12; SFX.click(); }
+      else if(b(13)){ menuSel=(menuSel+1)%ml2; padNavCooldown=12; SFX.click(); }
     }
   }
   // v83: D-pad left/right switch high-score tabs (without going back)
@@ -1307,6 +1336,8 @@ cv.addEventListener('pointerdown',e=>{
   }
   if(state==='dialogue'){ advanceDialogue(); return; }
   // v83: mouse click during play jumps (keyboard moves + mouse jumps together; touch taps unchanged)
+  if(state==='battleFind'){ battleFindTap(pt); return; }
+  if(state==='battle'){ battleTap(pt); return; }
   if(e.pointerType==='mouse'&&state==='play'&&!paused&&!dialogue){ jumpQueued=true; return; }
   if((state==='over'||state==='win')&&enteringInitials){
     // v63: tapping SAVE saves and returns to the title screen.
@@ -1334,11 +1365,13 @@ cv.addEventListener('pointerdown',e=>{
 });
 function menuAction(i){
   SFX.click();
-  if(i===0){ menuMode='main'; startIntro(); }
-  else if(i===1){ menuMode='settings'; }
-  else if(i===2){ menuMode='controls'; }
-  else if(i===3){ menuMode='scores'; }
-  else if(i===4){ menuMode='quit'; }
+  const act=titleMenuItems()[i];
+  if(act==='NEW GAME'){ menuMode='main'; startIntro(); }
+  else if(act==='COUPLES THERAPY'){ menuMode='main'; startCouplesTherapy(); }
+  else if(act==='SETTINGS'){ menuMode='settings'; }
+  else if(act==='CONTROLS'){ menuMode='controls'; }
+  else if(act==='HIGH SCORES'){ menuMode='scores'; }
+  else if(act==='QUIT'){ menuMode='quit'; }
 }
 function menuButtonAction(m,pt){
   if(m==='back'){ SFX.click(); menuMode='main'; return true; }
@@ -1363,6 +1396,11 @@ function advanceWin(){
   else winCutDone=true;
 }
 function advance(){
+  if(state==='battle'&&battle){
+    if(battle.phase==='matchEnd'){ battleRematch(); return; }
+    if(battle.phase==='partnerLeft'){ quitBattle(); return; }
+    return;
+  }
   if(state==='intro'){ if(introDlg>=0) advanceIntroDlg(); return; }
   if(state==='win'&&!winCutDone){ advanceWin(); return; }
   if(state==='dialogue'){ advanceDialogue(); return; }
@@ -2477,10 +2515,11 @@ function drawTitle(){
   uiText('Cardston Junior High needs you, Mr. Dobson!',W/2,200,'14px '+UI_FONT,'#bfdbfe','center');
   uiText('Move: Arrows  •  Jump: Space  •  Throw: X  •  Green: C  •  Gamepad supported',W/2,222,'12px '+UI_FONT,'#8fb8ee','center');
   titleButtons=[];
-  const menuItems=['NEW GAME','SETTINGS','CONTROLS','HIGH SCORES','QUIT'];
+  const menuItems=titleMenuItems();
   if(menuMode==='main'){
-    for(let i=0;i<5;i++){
-      const bx=330, by=232+i*48, bw=300, bh=40;
+    for(let i=0;i<menuItems.length;i++){
+      const step=menuItems.length>5?44:48;
+      const bx=330, by=232+i*step, bw=300, bh=40;
       const sel=i===menuSel;
       uiBtn(bx,by,bw,bh,sel,menuItems[i]);
       titleButtons.push({x:bx,y:by,w:bw,h:bh,menu:i});
@@ -2788,6 +2827,793 @@ function drawWin(){
   }
 }
 
+/* ---------------- Couples Therapy — 1v1 battle (v85) ---------------- */
+/* Android (Capacitor): networked 2-phone battle over PeerJS (same-room Wi-Fi).
+   Xbox (ms-appx-web): local 2-controller battle on one TV, one shared
+   Smash-style camera (midpoint + distance zoom, no split screen).
+   Web: the menu item is hidden, so the mode is unreachable there.
+   NOTE: no optional chaining or other post-ES2017 syntax in this section —
+   the Xbox copy runs on EdgeHTML. */
+function isXboxWeb(){ try{ return location.protocol==='ms-appx-web:'; }catch(e){ return false; } }
+function isAndroidApp(){ try{ return !!window.Capacitor; }catch(e){ return false; } }
+function hasCouplesTherapy(){ return isAndroidApp()||isXboxWeb(); }
+function titleMenuItems(){
+  if(!hasCouplesTherapy()) return ['NEW GAME','SETTINGS','CONTROLS','HIGH SCORES','QUIT'];
+  return ['NEW GAME','COUPLES THERAPY','SETTINGS','CONTROLS','HIGH SCORES','QUIT'];
+}
+
+var B_TILES_W=40, B_TILES_H=13, B_HP=100, B_HIT=20, B_START_AMMO=5, B_ROUNDS_TO_WIN=2;
+var B_GRID=[
+  '........................................',
+  '........................................',
+  '........................................',
+  '........................................',
+  '........................................',
+  '..........####............####..........',
+  '........................................',
+  '........................................',
+  '....####.........####...........####....',
+  '........................................',
+  '........................................',
+  '########..####################..########',
+  '########################################'
+];
+function bIsSolid(tx,ty){
+  if(ty<0) return false;
+  if(tx<0||tx>=B_TILES_W) return true;
+  if(ty>=B_TILES_H) return false;
+  return B_GRID[ty].charAt(tx)==='#';
+}
+function battleMoveX(p){
+  p.x+=p.vx;
+  const top=Math.floor(p.y/TILE), bot=Math.floor((p.y+p.h-1)/TILE);
+  if(p.vx>0){
+    const tx=Math.floor((p.x+p.w)/TILE);
+    for(let ty=top;ty<=bot;ty++) if(bIsSolid(tx,ty)){ p.x=tx*TILE-p.w-0.01; p.vx=0; break; }
+  }else if(p.vx<0){
+    const tx=Math.floor(p.x/TILE);
+    for(let ty=top;ty<=bot;ty++) if(bIsSolid(tx,ty)){ p.x=(tx+1)*TILE+0.01; p.vx=0; break; }
+  }
+}
+function battleMoveY(p){
+  p.y+=p.vy; p.onGround=false;
+  const l=Math.floor((p.x+3)/TILE), r=Math.floor((p.x+p.w-3)/TILE);
+  if(p.vy>0){
+    const ty=Math.floor((p.y+p.h)/TILE);
+    for(let tx=l;tx<=r;tx++) if(bIsSolid(tx,ty)){ p.y=ty*TILE-p.h; p.vy=0; p.onGround=true; break; }
+  }else if(p.vy<0){
+    const ty=Math.floor(p.y/TILE);
+    for(let tx=l;tx<=r;tx++) if(bIsSolid(tx,ty)){ p.y=(ty+1)*TILE+0.01; p.vy=0; break; }
+  }
+}
+function battleNewFighter(idx){
+  return {idx:idx,x:0,y:0,w:26,h:44,vx:0,vy:0,face:1,anim:0,onGround:true,coyote:0,jbuf:0,hp:B_HP,ammo:B_START_AMMO,iframes:0,throwCd:0,groundX:0,groundY:0};
+}
+function battlePlaceFighter(f,x,face){
+  f.x=x; f.y=396; f.vx=0; f.vy=0; f.face=face; f.hp=B_HP; f.ammo=B_START_AMMO;
+  f.iframes=0; f.throwCd=0; f.onGround=true; f.coyote=0; f.jbuf=0; f.groundX=x; f.groundY=396;
+}
+function battleBuildTwinkies(){
+  const list=[];
+  const ground=[2,3,5,6,11,12,13,16,18,19,21,22,23,27,28,29,33,34,36,37];
+  const row8=[5,6,18,19,33,34];
+  const row5=[11,12,27,28];
+  for(let i=0;i<ground.length;i++) list.push({x:ground[i]*40+7,y:426,taken:false,timer:0,takenBy:null});
+  for(let i=0;i<row8.length;i++) list.push({x:row8[i]*40+7,y:306,taken:false,timer:0,takenBy:null});
+  for(let i=0;i<row5.length;i++) list.push({x:row5[i]*40+7,y:186,taken:false,timer:0,takenBy:null});
+  return list;
+}
+function battleSpikeRects(){
+  const out=[];
+  const tiles=[14,15,24,25];
+  for(let i=0;i<tiles.length;i++) out.push({x:tiles[i]*40+4,y:424,w:32,h:16,sx:tiles[i]*40});
+  return out;
+}
+var battle=null, battleT=0, battleZoom=2, battleCamX=0, battleCamY=0;
+var battleThrowQueued=false, battlePadBWas=false, battlePadAWas=[false,false], battlePadRTWas=[false,false], battleQuitBWas=[false,false];
+var projSeq=0, hitSeen={};
+var peer=null, battleConn=null, pendingConn=null, incomingConn=null, incomingFrom='';
+var myCode='', findState='finding', findStatus='', findPeers=[], findRefreshT=0, inviteT=0, peerRetried=false, battleSyncTimer=null;
+
+function battleSend(d){
+  try{ if(battleConn&&battleConn.open) battleConn.send(d); }catch(e){}
+}
+function battlePads(){
+  try{
+    const g=navigator.getGamepads?navigator.getGamepads():[];
+    const out=[];
+    for(let i=0;i<g.length;i++){ if(g[i]) out.push(g[i]); }
+    return out;
+  }catch(e){ return []; }
+}
+function battlePadInput(padObj,idx){
+  const inp={left:false,right:false,jump:false,throw:false};
+  if(!padObj) return inp;
+  const ax=padObj.axes&&padObj.axes[0];
+  if(ax!==undefined&&ax!==null){
+    if(ax<-0.3) inp.left=true;
+    if(ax>0.3) inp.right=true;
+  }
+  const bs=padObj.buttons||[];
+  if(bs[14]&&bs[14].pressed) inp.left=true;
+  if(bs[15]&&bs[15].pressed) inp.right=true;
+  const aPressed=!!(bs[0]&&bs[0].pressed);
+  if(aPressed&&!battlePadAWas[idx]) inp.jump=true;
+  battlePadAWas[idx]=aPressed;
+  let rt=false;
+  if(bs[7]){
+    if(typeof bs[7].value==='number') rt=bs[7].value>0.5;
+    else rt=!!bs[7].pressed;
+  }
+  if(rt&&!battlePadRTWas[idx]) inp.throw=true;
+  battlePadRTWas[idx]=rt;
+  return inp;
+}
+function battleNew(mode,localIdx){
+  battle={mode:mode,localIdx:localIdx,fighters:[battleNewFighter(0),battleNewFighter(1)],projs:[],twinkies:battleBuildTwinkies(),spikes:battleSpikeRects(),wins:[0,0],round:1,matchWinner:null,phase:'banner',bannerT:90,roundT:0};
+  battlePlaceFighter(battle.fighters[0],120,1);
+  battlePlaceFighter(battle.fighters[1],1440,-1);
+  battleZoom=2; hitSeen={};
+}
+function battleResetRound(){
+  battlePlaceFighter(battle.fighters[0],120,1);
+  battlePlaceFighter(battle.fighters[1],1440,-1);
+  battle.projs=[];
+  for(let i=0;i<battle.twinkies.length;i++){ battle.twinkies[i].taken=false; battle.twinkies[i].timer=0; battle.twinkies[i].takenBy=null; }
+  battle.phase='banner'; battle.bannerT=90;
+}
+function battleResetMatch(){
+  battle.wins=[0,0]; battle.round=1; battle.matchWinner=null;
+  battleResetRound();
+}
+function battleThrow(idx){
+  if(!battle||battle.phase!=='fight') return;
+  const f=battle.fighters[idx];
+  if(f.throwCd>0||f.ammo<=0){ if(f.ammo<=0) SFX.click(); return; }
+  f.ammo--; f.throwCd=18;
+  battle.projs.push({x:f.x+f.w/2+f.face*14,y:f.y+16,vx:f.face*7,owner:idx,id:idx+'-'+(projSeq++)});
+  SFX.throw();
+}
+function battleThrowLocal(){
+  if(!battle) return;
+  if(battle.mode==='local') battleThrow(0);
+  else battleThrow(battle.localIdx);
+}
+function battleEndRound(winnerIdx){
+  if(!battle||battle.phase!=='fight') return;
+  battle.phase='roundEnd'; battle.roundT=150; battle.wins[winnerIdx]++;
+  SFX.win();
+  if(battle.wins[winnerIdx]>=B_ROUNDS_TO_WIN) battle.matchWinner=winnerIdx;
+}
+function battleHitFighter(victimIdx,dir,projId){
+  const f=battle.fighters[victimIdx];
+  f.hp-=B_HIT; f.iframes=45; f.vx=dir*4; f.vy=-6; SFX.hurt();
+  if(battle.mode==='net'&&victimIdx!==battle.localIdx){
+    battleSend({t:'hit',id:projId,hp:f.hp,dir:dir});
+  }
+  if(f.hp<=0) battleEndRound(1-victimIdx);
+}
+function battleApplyHit(d){
+  if(!battle||!battle.fighters||battle.phase!=='fight') return;
+  if(hitSeen[d.id]) return;
+  hitSeen[d.id]=true;
+  const f=battle.fighters[battle.localIdx];
+  f.hp=d.hp; f.iframes=45; f.vx=d.dir*4; f.vy=-6; SFX.hurt();
+  if(f.hp<=0){
+    battleSend({t:'round',winner:1-battle.localIdx});
+    battleEndRound(1-battle.localIdx);
+  }
+}
+function battleApplyState(d){
+  if(!battle||battle.phase!=='fight') return;
+  const ri=1-battle.localIdx;
+  const rf=battle.fighters[ri];
+  rf.x=d.x; rf.y=d.y; rf.vx=d.vx; rf.vy=d.vy; rf.face=d.face; rf.hp=d.hp; rf.ammo=d.ammo;
+  const mine=[];
+  for(let i=0;i<battle.projs.length;i++){ if(battle.projs[i].owner===battle.localIdx) mine.push(battle.projs[i]); }
+  const remote=[];
+  if(d.projs){
+    for(let i=0;i<d.projs.length;i++) remote.push({x:d.projs[i].x,y:d.projs[i].y,vx:d.projs[i].vx,owner:ri,id:d.projs[i].id});
+  }
+  battle.projs=mine.concat(remote);
+  const taken=d.taken||[];
+  for(let i=0;i<battle.twinkies.length;i++){
+    const t=battle.twinkies[i];
+    let claimed=false;
+    for(let j=0;j<taken.length;j++){ if(taken[j]===i) claimed=true; }
+    if(claimed&&!t.taken){ t.taken=true; t.takenBy=ri; }
+    else if(!claimed&&t.taken&&t.takenBy===ri){ t.taken=false; t.takenBy=null; }
+  }
+}
+function battleOnRoundMsg(d){
+  if(!battle) return;
+  if(battle.phase==='fight') battleEndRound(d.winner);
+}
+function battleOnData(d,conn){
+  if(!d||!d.t) return;
+  if(d.t==='accept'){
+    if(state==='battleFind'&&findState==='inviting'){
+      battleConn=conn;
+      startBattleNet('P1',conn);
+    }
+  } else if(d.t==='decline'){
+    if(state==='battleFind'&&findState==='inviting'){
+      findState='finding'; findStatus='They declined. Try someone else.';
+      try{ if(pendingConn) pendingConn.close(); }catch(e){}
+      pendingConn=null;
+    }
+  } else if(d.t==='s'){
+    if(state==='battle') battleApplyState(d);
+  } else if(d.t==='hit'){
+    if(state==='battle') battleApplyHit(d);
+  } else if(d.t==='round'){
+    if(state==='battle') battleOnRoundMsg(d);
+  } else if(d.t==='rematch'){
+    if(state==='battle') battleResetMatch();
+  } else if(d.t==='bye'){
+    if(state==='battle'&&battle.phase!=='partnerLeft'){
+      battle.phase='partnerLeft';
+    }
+  }
+}
+function battleStepFighter(f,inp,active){
+  if(!active){
+    f.anim+=Math.abs(f.vx)*0.09;
+    if(f.iframes>0) f.iframes--;
+    if(f.throwCd>0) f.throwCd--;
+    return;
+  }
+  f.vx=(inp.right?MOVE_SPD:0)-(inp.left?MOVE_SPD:0);
+  if(f.vx!==0) f.face=f.vx>0?1:-1;
+  f.vy=Math.min(f.vy+GRAV,MAX_FALL);
+  if(f.onGround) f.coyote=6; else if(f.coyote>0) f.coyote--;
+  if(inp.jump){ f.jbuf=7; } else if(f.jbuf>0) f.jbuf--;
+  if(f.jbuf>0&&(f.onGround||f.coyote>0)){
+    f.vy=JUMP_V; f.onGround=false; f.coyote=0; f.jbuf=0; SFX.jump();
+  }
+  battleMoveX(f); battleMoveY(f);
+  f.anim+=Math.abs(f.vx)*0.09;
+  if(f.iframes>0) f.iframes--;
+  if(f.throwCd>0) f.throwCd--;
+  if(f.onGround){ f.groundX=f.x; f.groundY=f.y; }
+  if(inp.throw) battleThrow(f.idx);
+}
+function updateBattle(){
+  if(!battle) return;
+  battleT++;
+  if(battle.phase==='banner'){
+    battle.bannerT--;
+    if(battle.bannerT<=0) battle.phase='fight';
+    return;
+  }
+  if(battle.phase==='roundEnd'){
+    battle.roundT--;
+    if(battle.roundT<=0){
+      if(battle.matchWinner!==null) battle.phase='matchEnd';
+      else { battle.round++; battleResetRound(); }
+    }
+    return;
+  }
+  if(battle.phase!=='fight') return;
+  let p1In={left:false,right:false,jump:false,throw:false};
+  let p2In={left:false,right:false,jump:false,throw:false};
+  if(battle.mode==='local'){
+    const pads=battlePads();
+    // B on either controller quits the battle (B is free here — RT throws)
+    for(let pi=0;pi<2;pi++){
+      const pd=pads[pi];
+      const bPressed=!!(pd&&pd.buttons&&pd.buttons[1]&&pd.buttons[1].pressed);
+      if(bPressed&&!battleQuitBWas[pi]){ quitBattle(); return; }
+      battleQuitBWas[pi]=bPressed;
+    }
+    p1In=battlePadInput(pads[0],0);
+    if(input.left) p1In.left=true;
+    if(input.right) p1In.right=true;
+    if(jumpQueued){ p1In.jump=true; jumpQueued=false; }
+    if(battleThrowQueued){ p1In.throw=true; battleThrowQueued=false; }
+    p2In=battlePadInput(pads[1],1);
+    battleStepFighter(battle.fighters[0],p1In,true);
+    battleStepFighter(battle.fighters[1],p2In,true);
+  } else {
+    const padDir=pad.left||pad.right;
+    const left=padDir?pad.left:input.left, right=padDir?pad.right:input.right;
+    let jmp=false, thr=false;
+    if(jumpQueued){ jmp=true; jumpQueued=false; }
+    if(battleThrowQueued){ thr=true; battleThrowQueued=false; }
+    const pads=battlePads();
+    const pad0=pads[0];
+    const bPressed=!!(pad0&&pad0.buttons&&pad0.buttons[1]&&pad0.buttons[1].pressed);
+    if(bPressed&&!battlePadBWas) thr=true;
+    battlePadBWas=bPressed;
+    const localIn={left:left,right:right,jump:jmp,throw:thr};
+    if(battle.localIdx===0){
+      battleStepFighter(battle.fighters[0],localIn,true);
+      battleStepFighter(battle.fighters[1],{left:false,right:false,jump:false,throw:false},false);
+    } else {
+      battleStepFighter(battle.fighters[0],{left:false,right:false,jump:false,throw:false},false);
+      battleStepFighter(battle.fighters[1],localIn,true);
+    }
+  }
+  // twinkie pickups + respawns (active fighters only)
+  for(let fi=0;fi<2;fi++){
+    const active=battle.mode==='local'||fi===battle.localIdx;
+    const f=battle.fighters[fi];
+    if(active){
+      for(let ti=0;ti<battle.twinkies.length;ti++){
+        const t=battle.twinkies[ti];
+        if(!t.taken&&rectsOverlap({x:f.x,y:f.y,w:f.w,h:f.h},{x:t.x,y:t.y,w:26,h:14})){
+          t.taken=true; t.takenBy=fi; t.timer=360; f.ammo++; SFX.collect();
+        }
+      }
+      // spikes: knockback only, never damage (players can only hurt each other by throwing)
+      if(f.iframes===0){
+        for(let si=0;si<battle.spikes.length;si++){
+          const s=battle.spikes[si];
+          if(rectsOverlap({x:f.x,y:f.y,w:f.w,h:f.h},{x:s.x,y:s.y,w:s.w,h:s.h})){
+            const dir=(f.x+f.w/2<s.x+s.w/2)?-1:1;
+            f.vx=dir*4; f.vy=-5; f.iframes=30; SFX.hit();
+            break;
+          }
+        }
+      }
+      // fell through a gap: respawn where last grounded, no health lost
+      if(f.y>ROWS*TILE+80){
+        f.x=f.groundX; f.y=f.groundY; f.vx=0; f.vy=0; f.iframes=60;
+      }
+    }
+  }
+  for(let ti=0;ti<battle.twinkies.length;ti++){
+    const t=battle.twinkies[ti];
+    if(t.taken&&t.takenBy===battle.localIdx&&battle.mode==='net'){
+      if(t.timer>0){ t.timer--; if(t.timer===0){ t.taken=false; t.takenBy=null; } }
+    } else if(t.taken&&battle.mode==='local'){
+      if(t.timer>0){ t.timer--; if(t.timer===0){ t.taken=false; t.takenBy=null; } }
+    }
+  }
+  // projectiles (only the owner's device simulates them; the other side draws them from sync)
+  for(let i=battle.projs.length-1;i>=0;i--){
+    const pr=battle.projs[i];
+    const simulated=battle.mode==='local'||pr.owner===battle.localIdx;
+    if(!simulated) continue;
+    pr.x+=pr.vx;
+    if(pr.x<0||pr.x>B_TILES_W*TILE||bIsSolid(Math.floor(pr.x/TILE),Math.floor(pr.y/TILE))){
+      battle.projs.splice(i,1); continue;
+    }
+    const victim=battle.fighters[1-pr.owner];
+    if(victim.iframes===0&&rectsOverlap({x:pr.x-13,y:pr.y-4,w:26,h:7},{x:victim.x,y:victim.y,w:victim.w,h:victim.h})){
+      battle.projs.splice(i,1);
+      battleHitFighter(1-pr.owner,pr.vx>0?1:-1,pr.id);
+    }
+  }
+}
+function battleDrawFighter(f){
+  if(f.iframes>0&&Math.floor(f.iframes/4)%2===0) return;
+  const moving=Math.abs(f.vx)>0.2;
+  if(f.idx===0){
+    let img=null;
+    if(ANIM.dobson&&ANIM.dobson.length===3){
+      img=moving?ANIM.dobson[Math.floor(f.anim*1.1)%3]:ANIM.dobson[0];
+    } else if(IMG.dobson&&IMG.dobson.complete&&IMG.dobson.naturalWidth>0) img=IMG.dobson;
+    const w=35,h=52,dx=f.x+f.w/2-w/2,dy=f.y+f.h-h;
+    if(img){
+      ctx.save();
+      ctx.translate(dx+w/2,dy+h);
+      if(f.face<0) ctx.scale(-1,1);
+      ctx.drawImage(img,-w/2,-h,w,h);
+      ctx.restore();
+    } else { ctx.fillStyle='#3b82f6'; ctx.fillRect(f.x,f.y,f.w,f.h); }
+  } else {
+    const img=IMG.mrsdobson32;
+    const w=24,h=52,dx=f.x+f.w/2-w/2,dy=f.y+f.h-h;
+    if(img&&img.complete&&img.naturalWidth>0){
+      ctx.save();
+      ctx.translate(dx+w/2,dy+h);
+      if(f.face<0) ctx.scale(-1,1);
+      ctx.drawImage(img,-w/2,-h,w,h);
+      ctx.restore();
+    } else { ctx.fillStyle='#ec4899'; ctx.fillRect(f.x,f.y,f.w,f.h); }
+  }
+}
+function battleDrawHealthBar(x,y,w,h,hp,color,flip){
+  ctx.fillStyle='rgba(0,0,0,0.55)'; ctx.fillRect(x-2,y-2,w+4,h+4);
+  ctx.fillStyle='#1f2937'; ctx.fillRect(x,y,w,h);
+  const fw=Math.max(0,w*hp/B_HP);
+  ctx.fillStyle=color;
+  if(flip) ctx.fillRect(x+w-fw,y,fw,h);
+  else ctx.fillRect(x,y,fw,h);
+}
+function drawBattle(){
+  if(!battle) return;
+  ctx.clearRect(0,0,W,H);
+  ctx.imageSmoothingEnabled=false;
+  const bg=BGIMG['LEVEL0'];
+  if(bg&&bg.complete&&bg.naturalWidth>0) ctx.drawImage(bg,0,0,W,H);
+  else { ctx.fillStyle='#7dd3fc'; ctx.fillRect(0,0,W,H); }
+  // Smash-style camera: midpoint, zoom out as the fighters separate
+  const f1=battle.fighters[0], f2=battle.fighters[1];
+  const cx=(f1.x+f1.w/2+f2.x+f2.w/2)/2, cy=(f1.y+f1.h/2+f2.y+f2.h/2)/2;
+  const dist=Math.hypot(f1.x-f2.x,f1.y-f2.y);
+  let tz=2.0;
+  if(dist>150) tz=Math.max(1.0,2.0-(dist-150)/850);
+  battleZoom+=(tz-battleZoom)*0.08;
+  const vw=W/battleZoom, vh=H/battleZoom;
+  const aw=B_TILES_W*TILE, ah=B_TILES_H*TILE;
+  battleCamX=(aw<=vw)?(aw-vw)/2:Math.max(0,Math.min(aw-vw,cx-vw/2));
+  battleCamY=(ah<=vh)?(ah-vh)/2:Math.max(0,Math.min(ah-vh,cy-vh/2));
+  ctx.save();
+  ctx.scale(battleZoom,battleZoom);
+  ctx.translate(-battleCamX,-battleCamY);
+  for(let ty=0;ty<B_TILES_H;ty++){
+    for(let tx=0;tx<B_TILES_W;tx++){
+      if(B_GRID[ty].charAt(tx)!=='#') continue;
+      const aboveEmpty=ty===0||B_GRID[ty-1].charAt(tx)!=='#';
+      const top=IMG.tile_top, fill=IMG.tile_fill;
+      if(aboveEmpty&&top&&top.complete&&top.naturalWidth>0) ctx.drawImage(top,tx*TILE,ty*TILE,TILE,TILE);
+      else if(fill&&fill.complete&&fill.naturalWidth>0) ctx.drawImage(fill,tx*TILE,ty*TILE,TILE,TILE);
+      else { ctx.fillStyle=aboveEmpty?'#60a5fa':'#1e3a8a'; ctx.fillRect(tx*TILE,ty*TILE,TILE,TILE); }
+    }
+  }
+  for(let i=0;i<battle.spikes.length;i++) drawSpikes({x:battle.spikes[i].sx,y:400});
+  for(let i=0;i<battle.twinkies.length;i++){
+    const t=battle.twinkies[i];
+    if(!t.taken) drawTwinkie(t.x,t.y,battleT*0.05+i*0.7);
+  }
+  battleDrawFighter(f1); battleDrawFighter(f2);
+  for(let i=0;i<battle.projs.length;i++){
+    const pr=battle.projs[i];
+    const timg=IMG.twinkie;
+    if(timg&&timg.complete&&timg.naturalWidth>0) ctx.drawImage(timg,pr.x-13,pr.y-4,26,7);
+    else { ctx.fillStyle='#fbbf24'; ctx.fillRect(pr.x-13,pr.y-4,26,7); }
+  }
+  ctx.restore();
+  // HUD: health bars, ammo, round pips
+  battleDrawHealthBar(20,16,300,22,f1.hp,'#3b82f6',false);
+  battleDrawHealthBar(640,16,300,22,f2.hp,'#ec4899',true);
+  ctx.textAlign='left'; ctx.textBaseline='middle';
+  ctx.font='14px Impact,"Arial Black",sans-serif'; ctx.fillStyle='#fff';
+  ctx.fillText('MR. DOBSON',20,52);
+  ctx.textAlign='right';
+  ctx.fillText('MRS. DOBSON',940,52);
+  ctx.textAlign='left'; ctx.font='13px Impact,"Arial Black",sans-serif';
+  ctx.fillText('AMMO x '+f1.ammo,20,72);
+  ctx.textAlign='right';
+  ctx.fillText('AMMO x '+f2.ammo,940,72);
+  for(let i=0;i<2;i++){
+    ctx.fillStyle=battle.wins[0]>i?'#fbbf24':'rgba(255,255,255,0.25)';
+    ctx.beginPath(); ctx.arc(336+i*22,27,7,0,Math.PI*2); ctx.fill();
+    ctx.fillStyle=battle.wins[1]>i?'#fbbf24':'rgba(255,255,255,0.25)';
+    ctx.beginPath(); ctx.arc(602+i*22,27,7,0,Math.PI*2); ctx.fill();
+  }
+  ctx.textAlign='center'; ctx.font='13px Impact,"Arial Black",sans-serif'; ctx.fillStyle='rgba(255,255,255,0.85)';
+  ctx.fillText('ROUND '+battle.round+'  ·  BEST OF 3',480,30);
+  if(battle.phase==='banner'){
+    ctx.font='bold 64px Impact,"Arial Black",sans-serif'; ctx.fillStyle='#fbbf24';
+    ctx.fillText('ROUND '+battle.round,480,230);
+    ctx.font='bold 40px Impact,"Arial Black",sans-serif'; ctx.fillStyle='#fff';
+    ctx.fillText('FIGHT!',480,290);
+  } else if(battle.phase==='roundEnd'){
+    ctx.font='bold 40px Impact,"Arial Black",sans-serif'; ctx.fillStyle='#fbbf24';
+    const wname=battle.wins[0]>battle.wins[1]?'MR. DOBSON':'MRS. DOBSON';
+    ctx.fillText(wname+' TAKES THE ROUND!',480,240);
+  } else if(battle.phase==='matchEnd'){
+    uiPanel(230,170,500,300);
+    uiText(battle.matchWinner===0?'MR. DOBSON WINS!':'MRS. DOBSON WINS!',480,230,'bold 40px '+UI_FONT,'#fbbf24','center');
+    uiText('Best of 3 · Final score '+battle.wins[0]+'–'+battle.wins[1],480,275,'16px '+UI_FONT,'#fff','center');
+    uiBtn(280,340,180,44,false,'REMATCH');
+    uiBtn(500,340,180,44,false,'QUIT TO TITLE');
+  } else if(battle.phase==='partnerLeft'){
+    uiPanel(230,170,500,300);
+    uiText('PARTNER LEFT',480,230,'bold 40px '+UI_FONT,'#fbbf24','center');
+    uiText('The other phone left the battle.',480,275,'16px '+UI_FONT,'#fff','center');
+    uiBtn(390,340,180,44,false,'QUIT TO TITLE');
+  }
+  if((battle.phase==='fight'||battle.phase==='banner'||battle.phase==='roundEnd')&&document.body.classList.contains('touch')){
+    uiBtn(440,88,80,28,false,'QUIT');
+  }
+}
+function battleTap(pt){
+  if(!battle) return;
+  function inR(x,y,w,h){ return pt.x>=x&&pt.x<=x+w&&pt.y>=y&&pt.y<=y+h; }
+  if(battle.phase==='matchEnd'){
+    if(inR(280,340,180,44)){ battleRematch(); return; }
+    if(inR(500,340,180,44)){ quitBattle(); return; }
+  } else if(battle.phase==='partnerLeft'){
+    if(inR(390,340,180,44)){ quitBattle(); return; }
+  } else if(document.body.classList.contains('touch')){
+    if(inR(440,88,80,28)){ quitBattle(); return; }
+  }
+}
+function battleRematch(){
+  if(!battle) return;
+  SFX.click();
+  battleResetMatch();
+  if(battle.mode==='net') battleSend({t:'rematch'});
+}
+function startBattleNet(role,conn){
+  battleConn=conn;
+  try{
+    conn.on('close',function(){
+      if(state==='battle'&&battle) battle.phase='partnerLeft';
+    });
+  }catch(e){}
+  battleNew('net',role==='P1'?0:1);
+  showBattleCodeInput(false);
+  document.body.classList.add('battle');
+  state='battle';
+  playSong(0);
+  try{ if(battleSyncTimer) clearInterval(battleSyncTimer); }catch(e){}
+  battleSyncTimer=setInterval(function(){
+    if(state!=='battle'||!battle) return;
+    const f=battle.fighters[battle.localIdx];
+    const taken=[];
+    for(let i=0;i<battle.twinkies.length;i++){ if(battle.twinkies[i].takenBy===battle.localIdx) taken.push(i); }
+    const myProjs=[];
+    for(let i=0;i<battle.projs.length;i++){
+      const p=battle.projs[i];
+      if(p.owner===battle.localIdx) myProjs.push({id:p.id,x:Math.round(p.x),y:Math.round(p.y),vx:p.vx});
+    }
+    battleSend({t:'s',x:Math.round(f.x),y:Math.round(f.y),vx:f.vx,vy:f.vy,face:f.face,hp:f.hp,ammo:f.ammo,projs:myProjs,taken:taken});
+  },50);
+}
+function startBattleLocal(){
+  battleNew('local',0);
+  showBattleCodeInput(false);
+  document.body.classList.add('battle');
+  state='battle';
+  playSong(0);
+}
+function quitBattle(){
+  try{ if(battleSyncTimer){ clearInterval(battleSyncTimer); battleSyncTimer=null; } }catch(e){}
+  try{ if(battleConn&&battleConn.open) battleConn.send({t:'bye'}); }catch(e){}
+  try{ if(battleConn) battleConn.close(); }catch(e){}
+  battleConn=null; pendingConn=null; incomingConn=null; battle=null;
+  try{ if(peer){ peer.destroy(); peer=null; } }catch(e){}
+  document.body.classList.remove('battle');
+  showBattleCodeInput(false);
+  state='title'; menuMode='main'; stopMusic();
+}
+function showBattleCodeInput(show){
+  const inp=document.getElementById('battleCodeInput');
+  if(!inp) return;
+  inp.style.display=show?'block':'none';
+}
+function battleRandCode(){
+  const chars='abcdefghjkmnpqrstuvwxyz23456789';
+  let out='';
+  for(let i=0;i<4;i++) out+=chars.charAt(Math.floor(Math.random()*chars.length));
+  return out;
+}
+function battleLoadPeer(){
+  if(typeof Peer!=='undefined'){ battleCreatePeer(); return; }
+  findState='loading';
+  const sc=document.createElement('script');
+  sc.src='https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';
+  sc.onload=function(){ battleCreatePeer(); };
+  sc.onerror=function(){ findState='error'; findStatus='Could not load the connection library. Check Wi-Fi and try again.'; };
+  document.head.appendChild(sc);
+}
+function battleCreatePeer(){
+  myCode=battleRandCode();
+  try{
+    peer=new Peer('dobson-'+myCode);
+  }catch(e){
+    findState='error'; findStatus='Could not start finding. Check Wi-Fi and try again.';
+    return;
+  }
+  peer.on('open',function(){
+    findState='finding'; findRefreshT=0;
+    battleRefreshPeers();
+  });
+  peer.on('connection',function(c){
+    c.on('data',function(d){
+      if(d&&d.t==='invite'&&state==='battleFind'&&findState==='finding'){
+        incomingConn=c; incomingFrom=d.from||'???'; findState='invited'; SFX.click();
+      } else battleOnData(d,c);
+    });
+  });
+  peer.on('error',function(err){
+    if(err&&err.type==='unavailable-id'&&!peerRetried){
+      peerRetried=true;
+      try{ peer.destroy(); }catch(e){}
+      battleCreatePeer();
+    } else {
+      findState='error'; findStatus='Connection error. Check Wi-Fi and try again.';
+    }
+  });
+}
+function battleRefreshPeers(){
+  if(!peer) return;
+  try{
+    peer.listAllPeers(function(list){
+      findPeers=[];
+      for(let i=0;i<list.length;i++){
+        const id=list[i];
+        if(id&&id.indexOf('dobson-')===0&&id!=='dobson-'+myCode) findPeers.push(id);
+      }
+      findPeers=findPeers.slice(0,5);
+    });
+  }catch(e){}
+}
+function battleInvite(id){
+  if(!peer) return;
+  findState='inviting'; inviteT=1200; findStatus='';
+  pendingConn=peer.connect(id);
+  pendingConn.on('open',function(){
+    try{ pendingConn.send({t:'invite',from:'dobson-'+myCode}); }catch(e){}
+  });
+  pendingConn.on('data',function(d){ battleOnData(d,pendingConn); });
+  pendingConn.on('close',function(){
+    if(state==='battleFind'&&findState==='inviting'){
+      findState='finding'; findStatus='That player left.';
+    }
+  });
+}
+function battleAcceptInvite(){
+  if(!incomingConn) return;
+  SFX.click();
+  try{ incomingConn.send({t:'accept'}); }catch(e){}
+  battleConn=incomingConn;
+  startBattleNet('P2',incomingConn);
+}
+function battleDeclineInvite(){
+  SFX.click();
+  try{ incomingConn.send({t:'decline'}); }catch(e){}
+  try{ incomingConn.close(); }catch(e){}
+  incomingConn=null; findState='finding'; findStatus='';
+}
+function startCouplesTherapy(){
+  SFX.click();
+  findPeers=[]; findStatus=''; findRefreshT=0; inviteT=0; peerRetried=false;
+  pendingConn=null; incomingConn=null;
+  if(isXboxWeb()){
+    findState='waitingPad';
+    state='battleFind';
+    return;
+  }
+  findState='loading';
+  state='battleFind';
+  battleLoadPeer();
+}
+function closeBattleFind(){
+  showBattleCodeInput(false);
+  try{ if(pendingConn) pendingConn.close(); }catch(e){}
+  pendingConn=null; incomingConn=null;
+  try{ if(peer){ peer.destroy(); peer=null; } }catch(e){}
+  state='title'; menuMode='main';
+}
+function updateBattleFind(){
+  if(isXboxWeb()){
+    if(battlePads().length>=2) startBattleLocal();
+    return;
+  }
+  if(findState==='finding'){
+    findRefreshT--;
+    if(findRefreshT<=0){ findRefreshT=180; battleRefreshPeers(); }
+  }
+  if(findState==='inviting'){
+    inviteT--;
+    if(inviteT<=0){
+      try{ if(pendingConn) pendingConn.close(); }catch(e){}
+      pendingConn=null; findState='finding'; findStatus='No answer. Try someone else.';
+    }
+  }
+}
+function battleFindTap(pt){
+  function inR(x,y,w,h){ return pt.x>=x&&pt.x<=x+w&&pt.y>=y&&pt.y<=y+h; }
+  if(inR(160,50,80,32)){
+    SFX.click();
+    if(findState==='inviting'){
+      try{ if(pendingConn) pendingConn.close(); }catch(e){}
+      pendingConn=null; findState='finding'; findStatus='';
+    } else if(findState==='invited'){
+      battleDeclineInvite();
+      closeBattleFind();
+    } else closeBattleFind();
+    return;
+  }
+  if(findState==='finding'&&isAndroidApp()){
+    if(inR(640,208,100,30)){ SFX.click(); battleRefreshPeers(); return; }
+    for(let i=0;i<findPeers.length;i++){
+      if(inR(280,246+i*40,400,34)){ SFX.click(); battleInvite(findPeers[i]); return; }
+    }
+    if(inR(420,462,120,40)){
+      const inp=document.getElementById('battleCodeInput');
+      let code=inp?inp.value.toLowerCase().replace(/[^a-z0-9]/g,''):'';
+      if(code.indexOf('dobson-')===0) code=code.slice(7);
+      if(code.length===4){ SFX.click(); battleInvite('dobson-'+code); }
+      else { SFX.click(); findStatus='Enter the 4-letter code shown on their phone.'; }
+      return;
+    }
+  }
+  if(findState==='invited'){
+    if(inR(330,300,140,44)){ battleAcceptInvite(); return; }
+    if(inR(490,300,140,44)){ battleDeclineInvite(); return; }
+  }
+}
+(function(){
+  const inp0=document.getElementById('battleCodeInput');
+  if(inp0&&!inp0.dataset.battleBound){
+    inp0.dataset.battleBound='1';
+    inp0.addEventListener('keydown',function(e){
+      if(e.key==='Enter'){ e.preventDefault(); battleFindTap({x:480,y:482}); }
+    });
+  }
+})();
+function drawBattleFind(){
+  ctx.clearRect(0,0,W,H);
+  ctx.imageSmoothingEnabled=false;
+  const bg=BGIMG['LEVEL0'];
+  if(bg&&bg.complete&&bg.naturalWidth>0) ctx.drawImage(bg,0,0,W,H);
+  else { ctx.fillStyle='#0f172a'; ctx.fillRect(0,0,W,H); }
+  uiPanel(140,36,680,496);
+  uiBtn(160,50,80,32,false,'BACK');
+  uiText('COUPLES THERAPY',480,90,'bold 34px '+UI_FONT,'#fbbf24','center');
+  if(isXboxWeb()){
+    const pads=battlePads().length;
+    uiText('TWO CONTROLLERS, ONE TV',480,130,'16px '+UI_FONT,'#bfdbfe','center');
+    uiText('PLAYER 1: MR. DOBSON',480,190,'bold 22px '+UI_FONT,'#fff','center');
+    uiText(pads>=1?'CONTROLLER 1 CONNECTED':'CONNECT CONTROLLER 1',480,220,'16px '+UI_FONT,pads>=1?'#4ade80':'#f87171','center');
+    uiText('PLAYER 2: MRS. DOBSON',480,280,'bold 22px '+UI_FONT,'#fff','center');
+    uiText(pads>=2?'CONTROLLER 2 CONNECTED — GET READY!':'CONNECT A SECOND CONTROLLER…',480,310,'16px '+UI_FONT,pads>=2?'#4ade80':'#f87171','center');
+    uiText('The battle starts automatically when the second controller connects.',480,360,'15px '+UI_FONT,'#bfdbfe','center');
+    uiText('Camera zooms with the distance between you — no split screen.',480,390,'15px '+UI_FONT,'#bfdbfe','center');
+    uiText('Move: stick / D-pad · Jump: A · Throw: RT · Quit: B',480,440,'15px '+UI_FONT,'#fff','center');
+    return;
+  }
+  if(findState==='loading'){
+    uiText('CONNECTING…',480,240,'bold 24px '+UI_FONT,'#fff','center');
+    return;
+  }
+  if(findState==='error'){
+    uiText(findStatus||'Something went wrong.',480,240,'18px '+UI_FONT,'#f87171','center');
+    uiText('Tap BACK and try again.',480,280,'15px '+UI_FONT,'#bfdbfe','center');
+    return;
+  }
+  if(findState==='inviting'){
+    uiText('INVITATION SENT',480,220,'bold 26px '+UI_FONT,'#fff','center');
+    uiText('WAITING FOR AN ANSWER…',480,260,'16px '+UI_FONT,'#bfdbfe','center');
+    uiText('Tap BACK to cancel.',480,300,'15px '+UI_FONT,'#bfdbfe','center');
+    return;
+  }
+  if(findState==='invited'){
+    uiText('YOU HAVE AN INVITATION!',480,200,'bold 26px '+UI_FONT,'#fbbf24','center');
+    uiText('Another player wants to battle you.',480,240,'16px '+UI_FONT,'#fff','center');
+    uiText('If you accept, you play as MRS. DOBSON.',480,265,'15px '+UI_FONT,'#bfdbfe','center');
+    uiBtn(330,300,140,44,false,'ACCEPT');
+    uiBtn(490,300,140,44,false,'DECLINE');
+    return;
+  }
+  uiText('YOUR CODE:',480,130,'16px '+UI_FONT,'#bfdbfe','center');
+  uiText(myCode?myCode.toUpperCase():'····',480,175,'bold 44px '+UI_FONT,'#fbbf24','center');
+  uiText('TAP A PLAYER TO INVITE:',280,232,'15px '+UI_FONT,'#bfdbfe','left');
+  uiBtn(640,208,100,30,false,'REFRESH');
+  if(findPeers.length===0){
+    uiText('No other players found yet.',480,280,'16px '+UI_FONT,'#fff','center');
+    uiText('Ask your partner to open Couples Therapy too.',480,305,'14px '+UI_FONT,'#bfdbfe','center');
+  } else {
+    for(let i=0;i<findPeers.length;i++){
+      const code=findPeers[i].slice(7).toUpperCase();
+      uiBtn(280,246+i*40,400,34,false,'PLAYER '+code+'  —  TAP TO INVITE');
+    }
+  }
+  uiText('OR TYPE THEIR CODE:',280,455,'15px '+UI_FONT,'#bfdbfe','left');
+  uiBtn(420,462,120,40,false,'INVITE');
+  if(findStatus){
+    ctx.textAlign='center'; ctx.font='13px '+UI_FONT; ctx.fillStyle='#f87171';
+    ctx.fillText(findStatus,480,525);
+  }
+  const inp=document.getElementById('battleCodeInput');
+  if(inp){
+    if(findState==='finding'){
+      if(inp.style.display!=='block') inp.style.display='block';
+      const r=cv.getBoundingClientRect();
+      inp.style.left=(r.left+(280/W)*r.width)+'px';
+      inp.style.top=(r.top+(462/H)*r.height)+'px';
+      inp.style.width=((120/W)*r.width)+'px';
+    } else inp.style.display='none';
+  }
+}
+
 /* ---------------- main render ---------------- */
 function render(){
   ctx.clearRect(0,0,W,H);
@@ -2796,6 +3622,8 @@ function render(){
   if(state==='dialogue'){ drawDialogue(); return; }
   if(state==='win'){ drawWin(); return; }
   if(state==='intro'){ drawIntro(); return; }
+  if(state==='battle'){ drawBattle(); return; }
+  if(state==='battleFind'){ drawBattleFind(); return; }
   drawBG();
   ctx.save();
   ctx.scale(ZOOM,ZOOM);
