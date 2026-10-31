@@ -161,7 +161,7 @@ document.getElementById('touch').addEventListener('contextmenu',e=>e.preventDefa
 // gesture at the touch layer stops it from ever starting.
 for(const ev of ['touchstart','touchmove']) document.getElementById('touch').addEventListener(ev,e=>e.preventDefault(),{passive:false});
 const W = 960, H = 540, TILE = 40, ROWS = 13;
-const GAME_VERSION='v85';
+const GAME_VERSION='v87';
 const GRAV = 0.62, MOVE_SPD = 3.4, JUMP_V = -13.2, MAX_FALL = 12;
 
 /* ---------------- utils ---------------- */
@@ -2914,6 +2914,8 @@ var battleThrowQueued=false, battlePadBWas=false, battlePadAWas=[false,false], b
 var projSeq=0, hitSeen={};
 var peer=null, battleConn=null, pendingConn=null, incomingConn=null, incomingFrom='';
 var myCode='', findState='finding', findStatus='', findPeers=[], findRefreshT=0, inviteT=0, peerRetried=false, battleSyncTimer=null;
+var battlePeerRetries=0, battlePeerTimer=null, battleRecreateTimer=null, battlePeerRecreating=false, battleScriptLoading=false;
+var findMode='rounds', invitedMode='rounds', sentMode='rounds', xboxModeDpadL=false, xboxModeDpadR=false;
 
 function battleSend(d){
   try{ if(battleConn&&battleConn.open) battleConn.send(d); }catch(e){}
@@ -2949,8 +2951,8 @@ function battlePadInput(padObj,idx){
   battlePadRTWas[idx]=rt;
   return inp;
 }
-function battleNew(mode,localIdx){
-  battle={mode:mode,localIdx:localIdx,fighters:[battleNewFighter(0),battleNewFighter(1)],projs:[],twinkies:battleBuildTwinkies(),spikes:battleSpikeRects(),wins:[0,0],round:1,matchWinner:null,phase:'banner',bannerT:90,roundT:0};
+function battleNew(mode,localIdx,winMode){
+  battle={mode:mode,localIdx:localIdx,winMode:winMode||'rounds',fighters:[battleNewFighter(0),battleNewFighter(1)],projs:[],twinkies:battleBuildTwinkies(),spikes:battleSpikeRects(),wins:[0,0],round:1,matchWinner:null,phase:'banner',bannerT:90,roundT:0,hits:[0,0],timeLeft:3600,timeupRemote:null,timeupT:0,suddenDeathBanner:0};
   battlePlaceFighter(battle.fighters[0],120,1);
   battlePlaceFighter(battle.fighters[1],1440,-1);
   battleZoom=2; hitSeen={};
@@ -2961,6 +2963,7 @@ function battleResetRound(){
   battle.projs=[];
   for(let i=0;i<battle.twinkies.length;i++){ battle.twinkies[i].taken=false; battle.twinkies[i].timer=0; battle.twinkies[i].takenBy=null; }
   battle.phase='banner'; battle.bannerT=90;
+  if(battle.winMode==='timed'){ battle.hits=[0,0]; battle.timeLeft=3600; battle.timeupRemote=null; battle.timeupT=0; battle.suddenDeathBanner=0; }
 }
 function battleResetMatch(){
   battle.wins=[0,0]; battle.round=1; battle.matchWinner=null;
@@ -2986,26 +2989,44 @@ function battleEndRound(winnerIdx){
   if(battle.wins[winnerIdx]>=B_ROUNDS_TO_WIN) battle.matchWinner=winnerIdx;
 }
 function battleHitFighter(victimIdx,dir,projId){
+  const attacker=1-victimIdx;
   const f=battle.fighters[victimIdx];
+  if(battle.phase==='suddenDeath'){
+    f.hp-=B_HIT; f.iframes=45; f.vx=dir*4; f.vy=-6; SFX.hurt();
+    if(battle.mode==='net'&&victimIdx!==battle.localIdx) battleSend({t:'hit',id:projId,hp:f.hp,dir:dir});
+    battle.matchWinner=attacker; battle.phase='matchEnd'; SFX.win();
+    return;
+  }
+  if(battle.winMode==='timed') battle.hits[attacker]++;
   f.hp-=B_HIT; f.iframes=45; f.vx=dir*4; f.vy=-6; SFX.hurt();
   if(battle.mode==='net'&&victimIdx!==battle.localIdx){
     battleSend({t:'hit',id:projId,hp:f.hp,dir:dir});
   }
-  if(f.hp<=0) battleEndRound(1-victimIdx);
+  if(f.hp<=0){
+    if(battle.winMode==='timed'){
+      f.x=f.idx===0?120:1440; f.y=396; f.vx=0; f.vy=0; f.hp=B_HP; f.iframes=120; f.groundX=f.x; f.groundY=396;
+    } else battleEndRound(attacker);
+  }
 }
 function battleApplyHit(d){
-  if(!battle||!battle.fighters||battle.phase!=='fight') return;
+  if(!battle||!battle.fighters||(battle.phase!=='fight'&&battle.phase!=='suddenDeath')) return;
   if(hitSeen[d.id]) return;
   hitSeen[d.id]=true;
+  if(battle.winMode==='timed') battle.hits[1-battle.localIdx]++;
   const f=battle.fighters[battle.localIdx];
   f.hp=d.hp; f.iframes=45; f.vx=d.dir*4; f.vy=-6; SFX.hurt();
+  if(battle.phase==='suddenDeath'){ battle.matchWinner=1-battle.localIdx; battle.phase='matchEnd'; SFX.win(); return; }
   if(f.hp<=0){
-    battleSend({t:'round',winner:1-battle.localIdx});
-    battleEndRound(1-battle.localIdx);
+    if(battle.winMode==='timed'){
+      f.x=f.idx===0?120:1440; f.y=396; f.vx=0; f.vy=0; f.hp=B_HP; f.iframes=120; f.groundX=f.x; f.groundY=396;
+    } else {
+      battleSend({t:'round',winner:1-battle.localIdx});
+      battleEndRound(1-battle.localIdx);
+    }
   }
 }
 function battleApplyState(d){
-  if(!battle||battle.phase!=='fight') return;
+  if(!battle||(battle.phase!=='fight'&&battle.phase!=='suddenDeath')) return;
   const ri=1-battle.localIdx;
   const rf=battle.fighters[ri];
   rf.x=d.x; rf.y=d.y; rf.vx=d.vx; rf.vy=d.vy; rf.face=d.face; rf.hp=d.hp; rf.ammo=d.ammo;
@@ -3025,6 +3046,19 @@ function battleApplyState(d){
     else if(!claimed&&t.taken&&t.takenBy===ri){ t.taken=false; t.takenBy=null; }
   }
 }
+function decideTimedWinner(){
+  let h0,h1;
+  if(battle.mode==='local'){ h0=battle.hits[0]; h1=battle.hits[1]; }
+  else {
+    const own=battle.hits[battle.localIdx];
+    const rem=battle.timeupRemote;
+    if(battle.localIdx===0){ h0=own; h1=(rem!==null&&rem!==undefined)?rem:battle.hits[1]; }
+    else { h0=(rem!==null&&rem!==undefined)?rem:battle.hits[0]; h1=own; }
+  }
+  if(h0>h1){ battle.matchWinner=0; battle.phase='matchEnd'; SFX.win(); }
+  else if(h1>h0){ battle.matchWinner=1; battle.phase='matchEnd'; SFX.win(); }
+  else { battle.phase='suddenDeath'; battle.suddenDeathBanner=150; SFX.win(); }
+}
 function battleOnRoundMsg(d){
   if(!battle) return;
   if(battle.phase==='fight') battleEndRound(d.winner);
@@ -3034,7 +3068,7 @@ function battleOnData(d,conn){
   if(d.t==='accept'){
     if(state==='battleFind'&&findState==='inviting'){
       battleConn=conn;
-      startBattleNet('P1',conn);
+      startBattleNet('P1',conn,sentMode);
     }
   } else if(d.t==='decline'){
     if(state==='battleFind'&&findState==='inviting'){
@@ -3050,6 +3084,8 @@ function battleOnData(d,conn){
     if(state==='battle') battleOnRoundMsg(d);
   } else if(d.t==='rematch'){
     if(state==='battle') battleResetMatch();
+  } else if(d.t==='timeup'){
+    if(state==='battle') battle.timeupRemote=d.hits;
   } else if(d.t==='bye'){
     if(state==='battle'&&battle.phase!=='partnerLeft'){
       battle.phase='partnerLeft';
@@ -3094,7 +3130,23 @@ function updateBattle(){
     }
     return;
   }
-  if(battle.phase!=='fight') return;
+  if(battle.phase==='timeup'){
+    battle.timeupT--;
+    if(battle.timeupRemote!==null&&battle.timeupRemote!==undefined){ decideTimedWinner(); return; }
+    if(battle.timeupT<=0){ decideTimedWinner(); return; }
+    return;
+  }
+  if(battle.phase!=='fight'&&battle.phase!=='suddenDeath') return;
+  if(battle.winMode==='timed'&&battle.phase==='fight'){
+    battle.timeLeft--;
+    if(battle.timeLeft<=0){
+      if(battle.mode==='local'){ decideTimedWinner(); return; }
+      battle.phase='timeup'; battle.timeupT=60; battle.timeupRemote=null;
+      battleSend({t:'timeup',hits:battle.hits[battle.localIdx]});
+      return;
+    }
+  }
+  if(battle.suddenDeathBanner>0) battle.suddenDeathBanner--;
   let p1In={left:false,right:false,jump:false,throw:false};
   let p2In={left:false,right:false,jump:false,throw:false};
   if(battle.mode==='local'){
@@ -3278,14 +3330,23 @@ function drawBattle(){
   ctx.fillText('AMMO x '+f1.ammo,20,72);
   ctx.textAlign='right';
   ctx.fillText('AMMO x '+f2.ammo,940,72);
-  for(let i=0;i<2;i++){
+  if(battle.winMode!=='timed') for(let i=0;i<2;i++){
     ctx.fillStyle=battle.wins[0]>i?'#fbbf24':'rgba(255,255,255,0.25)';
     ctx.beginPath(); ctx.arc(336+i*22,27,7,0,Math.PI*2); ctx.fill();
     ctx.fillStyle=battle.wins[1]>i?'#fbbf24':'rgba(255,255,255,0.25)';
     ctx.beginPath(); ctx.arc(602+i*22,27,7,0,Math.PI*2); ctx.fill();
   }
-  ctx.textAlign='center'; ctx.font='13px Impact,"Arial Black",sans-serif'; ctx.fillStyle='rgba(255,255,255,0.85)';
-  ctx.fillText('ROUND '+battle.round+'  ·  BEST OF 3',480,30);
+  ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.85)';
+  if(battle.winMode==='timed'){
+    const secs=Math.max(0,Math.ceil(battle.timeLeft/60));
+    ctx.font='bold 20px Impact,"Arial Black",sans-serif'; ctx.fillStyle=secs<=10?'#f87171':'#fff';
+    ctx.fillText(Math.floor(secs/60)+':'+('0'+(secs%60)).slice(-2),480,28);
+    ctx.font='13px Impact,"Arial Black",sans-serif'; ctx.fillStyle='rgba(255,255,255,0.85)';
+    ctx.fillText('HITS  '+battle.hits[0]+' – '+battle.hits[1]+'  ·  MOST HITS IN 1 MIN',480,50);
+  } else {
+    ctx.font='13px Impact,"Arial Black",sans-serif';
+    ctx.fillText('ROUND '+battle.round+'  ·  BEST OF 3',480,30);
+  }
   if(battle.phase==='banner'){
     ctx.font='bold 64px Impact,"Arial Black",sans-serif'; ctx.fillStyle='#fbbf24';
     ctx.fillText('ROUND '+battle.round,480,230);
@@ -3295,10 +3356,19 @@ function drawBattle(){
     ctx.font='bold 40px Impact,"Arial Black",sans-serif'; ctx.fillStyle='#fbbf24';
     const wname=battle.wins[0]>battle.wins[1]?'MR. DOBSON':'MRS. DOBSON';
     ctx.fillText(wname+' TAKES THE ROUND!',480,240);
+  } else if(battle.phase==='timeup'){
+    ctx.font='bold 64px Impact,"Arial Black",sans-serif'; ctx.fillStyle='#fbbf24';
+    ctx.fillText('TIME!',480,240);
+  } else if(battle.phase==='suddenDeath'&&battle.suddenDeathBanner>0){
+    ctx.font='bold 44px Impact,"Arial Black",sans-serif'; ctx.fillStyle='#fbbf24';
+    ctx.fillText('SUDDEN DEATH!',480,230);
+    ctx.font='bold 28px Impact,"Arial Black",sans-serif'; ctx.fillStyle='#fff';
+    ctx.fillText('NEXT HIT WINS!',480,280);
   } else if(battle.phase==='matchEnd'){
     uiPanel(230,170,500,300);
     uiText(battle.matchWinner===0?'MR. DOBSON WINS!':'MRS. DOBSON WINS!',480,230,'bold 40px '+UI_FONT,'#fbbf24','center');
-    uiText('Best of 3 · Final score '+battle.wins[0]+'–'+battle.wins[1],480,275,'16px '+UI_FONT,'#fff','center');
+    if(battle.winMode==='timed') uiText(battle.hits[0]+' – '+battle.hits[1]+' hits',480,275,'16px '+UI_FONT,'#fff','center');
+    else uiText('Best of 3 · Final score '+battle.wins[0]+'–'+battle.wins[1],480,275,'16px '+UI_FONT,'#fff','center');
     uiBtn(280,340,180,44,false,'REMATCH');
     uiBtn(500,340,180,44,false,'QUIT TO TITLE');
   } else if(battle.phase==='partnerLeft'){
@@ -3307,7 +3377,7 @@ function drawBattle(){
     uiText('The other phone left the battle.',480,275,'16px '+UI_FONT,'#fff','center');
     uiBtn(390,340,180,44,false,'QUIT TO TITLE');
   }
-  if((battle.phase==='fight'||battle.phase==='banner'||battle.phase==='roundEnd')&&document.body.classList.contains('touch')){
+  if(battle.phase!=='matchEnd'&&battle.phase!=='partnerLeft'&&document.body.classList.contains('touch')){
     uiBtn(440,88,80,28,false,'QUIT');
   }
 }
@@ -3329,14 +3399,14 @@ function battleRematch(){
   battleResetMatch();
   if(battle.mode==='net') battleSend({t:'rematch'});
 }
-function startBattleNet(role,conn){
+function startBattleNet(role,conn,winMode){
   battleConn=conn;
   try{
     conn.on('close',function(){
       if(state==='battle'&&battle) battle.phase='partnerLeft';
     });
   }catch(e){}
-  battleNew('net',role==='P1'?0:1);
+  battleNew('net',role==='P1'?0:1,winMode);
   showBattleCodeInput(false);
   document.body.classList.add('battle');
   state='battle';
@@ -3355,8 +3425,8 @@ function startBattleNet(role,conn){
     battleSend({t:'s',x:Math.round(f.x),y:Math.round(f.y),vx:f.vx,vy:f.vy,face:f.face,hp:f.hp,ammo:f.ammo,projs:myProjs,taken:taken});
   },50);
 }
-function startBattleLocal(){
-  battleNew('local',0);
+function startBattleLocal(winMode){
+  battleNew('local',0,winMode);
   showBattleCodeInput(false);
   document.body.classList.add('battle');
   state='battle';
@@ -3385,40 +3455,74 @@ function battleRandCode(){
 }
 function battleLoadPeer(){
   if(typeof Peer!=='undefined'){ battleCreatePeer(); return; }
+  if(battleScriptLoading) return;
+  battleScriptLoading=true;
   findState='loading';
   const sc=document.createElement('script');
   sc.src='https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js';
-  sc.onload=function(){ battleCreatePeer(); };
-  sc.onerror=function(){ findState='error'; findStatus='Could not load the connection library. Check Wi-Fi and try again.'; };
+  sc.onload=function(){ battleScriptLoading=false; if(state==='battleFind') battleCreatePeer(); };
+  sc.onerror=function(){ battleScriptLoading=false; findState='error'; findStatus='Could not load the connection library. Check Wi-Fi and try again.'; };
   document.head.appendChild(sc);
 }
+function battlePeerError(err){
+  const t=err&&err.type?err.type:'unknown';
+  if(state!=='battleFind') return;
+  if(findState!=='loading'&&findState!=='finding'){
+    findState='error'; findStatus='Connection error ('+t+'). Check Wi-Fi and try again.';
+    return;
+  }
+  if(t==='unavailable-id'&&!peerRetried){
+    peerRetried=true; myCode='';
+    battleRecreatePeer();
+    return;
+  }
+  if(battlePeerRetries<3){
+    battlePeerRetries++;
+    findStatus='Connection hiccup ('+t+') — retrying…';
+    battleRecreatePeer();
+    return;
+  }
+  findState='error'; findStatus='Connection error ('+t+'). Check Wi-Fi and try again.';
+}
+function battleRecreatePeer(){
+  battlePeerRecreating=true;
+  try{ if(battlePeerTimer){ clearTimeout(battlePeerTimer); battlePeerTimer=null; } }catch(e){}
+  try{ if(battleRecreateTimer){ clearTimeout(battleRecreateTimer); battleRecreateTimer=null; } }catch(e){}
+  try{ if(peer){ peer.destroy(); } }catch(e){}
+  peer=null;
+  battleRecreateTimer=setTimeout(function(){
+    battlePeerRecreating=false; battleRecreateTimer=null;
+    if(state==='battleFind') battleCreatePeer();
+  },1500);
+}
 function battleCreatePeer(){
-  myCode=battleRandCode();
+  battlePeerRecreating=false;
+  if(!myCode) myCode=battleRandCode();
   try{
     peer=new Peer('dobson-'+myCode);
   }catch(e){
     findState='error'; findStatus='Could not start finding. Check Wi-Fi and try again.';
     return;
   }
+  try{ if(battlePeerTimer){ clearTimeout(battlePeerTimer); battlePeerTimer=null; } }catch(e){}
+  battlePeerTimer=setTimeout(function(){
+    if(state==='battleFind'&&findState==='loading') battlePeerError({type:'timeout'});
+  },10000);
   peer.on('open',function(){
+    try{ if(battlePeerTimer){ clearTimeout(battlePeerTimer); battlePeerTimer=null; } }catch(e){}
     findState='finding'; findRefreshT=0;
     battleRefreshPeers();
   });
   peer.on('connection',function(c){
     c.on('data',function(d){
       if(d&&d.t==='invite'&&state==='battleFind'&&findState==='finding'){
-        incomingConn=c; incomingFrom=d.from||'???'; findState='invited'; SFX.click();
+        incomingConn=c; incomingFrom=d.from||'???'; invitedMode=d.mode||'rounds'; findState='invited'; SFX.click();
       } else battleOnData(d,c);
     });
   });
-  peer.on('error',function(err){
-    if(err&&err.type==='unavailable-id'&&!peerRetried){
-      peerRetried=true;
-      try{ peer.destroy(); }catch(e){}
-      battleCreatePeer();
-    } else {
-      findState='error'; findStatus='Connection error. Check Wi-Fi and try again.';
-    }
+  peer.on('error',function(err){ battlePeerError(err); });
+  peer.on('disconnected',function(){
+    if(!battlePeerRecreating) battlePeerError({type:'disconnected'});
   });
 }
 function battleRefreshPeers(){
@@ -3437,9 +3541,10 @@ function battleRefreshPeers(){
 function battleInvite(id){
   if(!peer) return;
   findState='inviting'; inviteT=1200; findStatus='';
+  sentMode=findMode;
   pendingConn=peer.connect(id);
   pendingConn.on('open',function(){
-    try{ pendingConn.send({t:'invite',from:'dobson-'+myCode}); }catch(e){}
+    try{ pendingConn.send({t:'invite',from:'dobson-'+myCode,mode:sentMode}); }catch(e){}
   });
   pendingConn.on('data',function(d){ battleOnData(d,pendingConn); });
   pendingConn.on('close',function(){
@@ -3453,7 +3558,7 @@ function battleAcceptInvite(){
   SFX.click();
   try{ incomingConn.send({t:'accept'}); }catch(e){}
   battleConn=incomingConn;
-  startBattleNet('P2',incomingConn);
+  startBattleNet('P2',incomingConn,invitedMode);
 }
 function battleDeclineInvite(){
   SFX.click();
@@ -3464,6 +3569,9 @@ function battleDeclineInvite(){
 function startCouplesTherapy(){
   SFX.click();
   findPeers=[]; findStatus=''; findRefreshT=0; inviteT=0; peerRetried=false;
+  myCode=''; battlePeerRetries=0; battlePeerRecreating=false;
+  try{ if(battlePeerTimer){ clearTimeout(battlePeerTimer); battlePeerTimer=null; } }catch(e){}
+  try{ if(battleRecreateTimer){ clearTimeout(battleRecreateTimer); battleRecreateTimer=null; } }catch(e){}
   pendingConn=null; incomingConn=null;
   if(isXboxWeb()){
     findState='waitingPad';
@@ -3476,6 +3584,8 @@ function startCouplesTherapy(){
 }
 function closeBattleFind(){
   showBattleCodeInput(false);
+  try{ if(battlePeerTimer){ clearTimeout(battlePeerTimer); battlePeerTimer=null; } }catch(e){}
+  try{ if(battleRecreateTimer){ clearTimeout(battleRecreateTimer); battleRecreateTimer=null; } }catch(e){}
   try{ if(pendingConn) pendingConn.close(); }catch(e){}
   pendingConn=null; incomingConn=null;
   try{ if(peer){ peer.destroy(); peer=null; } }catch(e){}
@@ -3483,7 +3593,13 @@ function closeBattleFind(){
 }
 function updateBattleFind(){
   if(isXboxWeb()){
-    if(battlePads().length>=2) startBattleLocal();
+    const pads0=battlePads();
+    const pd0=pads0[0];
+    const dl=!!(pd0&&pd0.buttons&&pd0.buttons[14]&&pd0.buttons[14].pressed);
+    const dr=!!(pd0&&pd0.buttons&&pd0.buttons[15]&&pd0.buttons[15].pressed);
+    if((dl&&!xboxModeDpadL)||(dr&&!xboxModeDpadR)){ findMode=findMode==='rounds'?'timed':'rounds'; SFX.click(); }
+    xboxModeDpadL=dl; xboxModeDpadR=dr;
+    if(pads0.length>=2) startBattleLocal(findMode);
     return;
   }
   if(findState==='finding'){
@@ -3511,8 +3627,19 @@ function battleFindTap(pt){
     } else closeBattleFind();
     return;
   }
+  if(findState==='error'&&inR(390,320,180,44)){
+    SFX.click();
+    battlePeerRetries=0; peerRetried=false; myCode=''; findStatus='';
+    try{ if(battlePeerTimer){ clearTimeout(battlePeerTimer); battlePeerTimer=null; } }catch(e){}
+    try{ if(battleRecreateTimer){ clearTimeout(battleRecreateTimer); battleRecreateTimer=null; } }catch(e){}
+    try{ if(peer){ peer.destroy(); } }catch(e){}
+    peer=null; findState='loading';
+    battleLoadPeer();
+    return;
+  }
   if(findState==='finding'&&isAndroidApp()){
-    if(inR(640,208,100,30)){ SFX.click(); battleRefreshPeers(); return; }
+    if(inR(380,196,140,30)){ SFX.click(); findMode='rounds'; return; }
+    if(inR(530,196,200,30)){ SFX.click(); findMode='timed'; return; }
     for(let i=0;i<findPeers.length;i++){
       if(inR(280,246+i*40,400,34)){ SFX.click(); battleInvite(findPeers[i]); return; }
     }
@@ -3526,8 +3653,8 @@ function battleFindTap(pt){
     }
   }
   if(findState==='invited'){
-    if(inR(330,300,140,44)){ battleAcceptInvite(); return; }
-    if(inR(490,300,140,44)){ battleDeclineInvite(); return; }
+    if(inR(330,310,140,44)){ battleAcceptInvite(); return; }
+    if(inR(490,310,140,44)){ battleDeclineInvite(); return; }
   }
 }
 (function(){
@@ -3557,16 +3684,21 @@ function drawBattleFind(){
     uiText(pads>=2?'CONTROLLER 2 CONNECTED — GET READY!':'CONNECT A SECOND CONTROLLER…',480,310,'16px '+UI_FONT,pads>=2?'#4ade80':'#f87171','center');
     uiText('The battle starts automatically when the second controller connects.',480,360,'15px '+UI_FONT,'#bfdbfe','center');
     uiText('Camera zooms with the distance between you — no split screen.',480,390,'15px '+UI_FONT,'#bfdbfe','center');
-    uiText('Move: stick / D-pad · Jump: A · Throw: RT · Quit: B',480,440,'15px '+UI_FONT,'#fff','center');
+    uiText('WIN BY:',480,420,'15px '+UI_FONT,'#bfdbfe','center');
+    uiBtn(330,440,140,30,findMode==='rounds','BEST OF 3');
+    uiBtn(490,440,140,30,findMode==='timed','MOST HITS · 1 MIN');
+    uiText('D-pad: choose win condition · Move: stick / D-pad · Jump: A · Throw: RT · Quit: B',480,500,'15px '+UI_FONT,'#fff','center');
     return;
   }
   if(findState==='loading'){
     uiText('CONNECTING…',480,240,'bold 24px '+UI_FONT,'#fff','center');
+    if(findStatus) uiText(findStatus,480,280,'15px '+UI_FONT,'#bfdbfe','center');
     return;
   }
   if(findState==='error'){
     uiText(findStatus||'Something went wrong.',480,240,'18px '+UI_FONT,'#f87171','center');
-    uiText('Tap BACK and try again.',480,280,'15px '+UI_FONT,'#bfdbfe','center');
+    uiText('Tap RETRY to try again, or BACK to leave.',480,280,'15px '+UI_FONT,'#bfdbfe','center');
+    uiBtn(390,320,180,44,false,'RETRY');
     return;
   }
   if(findState==='inviting'){
@@ -3576,17 +3708,20 @@ function drawBattleFind(){
     return;
   }
   if(findState==='invited'){
-    uiText('YOU HAVE AN INVITATION!',480,200,'bold 26px '+UI_FONT,'#fbbf24','center');
-    uiText('Another player wants to battle you.',480,240,'16px '+UI_FONT,'#fff','center');
-    uiText('If you accept, you play as MRS. DOBSON.',480,265,'15px '+UI_FONT,'#bfdbfe','center');
-    uiBtn(330,300,140,44,false,'ACCEPT');
-    uiBtn(490,300,140,44,false,'DECLINE');
+    uiText('YOU HAVE AN INVITATION!',480,190,'bold 26px '+UI_FONT,'#fbbf24','center');
+    uiText('Another player wants to battle you.',480,230,'16px '+UI_FONT,'#fff','center');
+    uiText('They want to play: '+(invitedMode==='timed'?'MOST HITS IN 1 MIN':'BEST OF 3'),480,255,'16px '+UI_FONT,'#fbbf24','center');
+    uiText('If you accept, you play as MRS. DOBSON.',480,280,'15px '+UI_FONT,'#bfdbfe','center');
+    uiBtn(330,310,140,44,false,'ACCEPT');
+    uiBtn(490,310,140,44,false,'DECLINE');
     return;
   }
   uiText('YOUR CODE:',480,130,'16px '+UI_FONT,'#bfdbfe','center');
   uiText(myCode?myCode.toUpperCase():'····',480,175,'bold 44px '+UI_FONT,'#fbbf24','center');
+  uiText('WIN BY:',280,212,'15px '+UI_FONT,'#bfdbfe','left');
+  uiBtn(380,196,140,30,findMode==='rounds','BEST OF 3');
+  uiBtn(530,196,200,30,findMode==='timed','MOST HITS IN 1 MIN');
   uiText('TAP A PLAYER TO INVITE:',280,232,'15px '+UI_FONT,'#bfdbfe','left');
-  uiBtn(640,208,100,30,false,'REFRESH');
   if(findPeers.length===0){
     uiText('No other players found yet.',480,280,'16px '+UI_FONT,'#fff','center');
     uiText('Ask your partner to open Couples Therapy too.',480,305,'14px '+UI_FONT,'#bfdbfe','center');

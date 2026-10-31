@@ -111,8 +111,10 @@ Couples Therapy mode from the main menu. Connect a second controller
 and the battle starts automatically — two players on one TV, no split
 screen: the camera follows the midpoint between Mr. Dobson and
 Mrs. Dobson and zooms out as they separate. Move: stick / D-pad,
-Jump: A, Throw: RT, Quit: B. Best of 3 rounds; only thrown Twinkies
-damage the other player (spikes only knock you back, falling in a gap
+Jump: A, Throw: RT, Quit: B. Win condition is selectable on the
+waiting screen with the D-pad: best of 3 rounds, or most hits in
+1 minute (a tie goes to sudden death — next hit wins). Only thrown
+Twinkies damage the other player (spikes only knock you back, falling in a gap
 just respawns you). The packaged manifest is still 1.84.0.0, so
 install the v85 bundle after uninstalling the old Xbox app.
 
