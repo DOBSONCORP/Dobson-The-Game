@@ -1,6 +1,6 @@
 # DOBSON — UWP app for Xbox (dev kit)
 
-A Universal Windows Platform wrapper around **Dobson – The Game, v84**.
+A Universal Windows Platform wrapper around **Dobson – The Game, v93**.
 The whole game is one local HTML file (`DobsonGame/Assets/game/index.html`,
 byte-identical to the current web build), shown fullscreen in a WebView.
 It works fully offline: every sprite, background and song is embedded in
@@ -10,14 +10,14 @@ that file. No Store submission, no network, no special capabilities.
 
 - `DobsonGame.sln` — the Visual Studio solution (x64 only: that's what Xbox is).
 - `DobsonGame/` — the app itself:
-  - `Package.appxmanifest` — identity `DobsonGame`, version **1.84.0.0**,
+  - `Package.appxmanifest` — identity `DobsonGame`, version **1.93.0.0**,
     targets `Windows.Universal` + `Windows.Xbox` (min 10.0.17763.0).
   - `App.xaml(.cs)` — launches straight into fullscreen.
   - `MainPage.xaml(.cs)` — a page holding *only* a WebView. That's
     deliberate: with no other focusable controls, the controller's input
     goes to the game's own Gamepad API/keyboard handling instead of XAML
     focus navigation. The WebView is given focus once the game loads.
-  - `Assets/game/index.html` — the v84 game. Replace this file to update
+  - `Assets/game/index.html` — the v93 game. Replace this file to update
     the game (see "Updating" below).
   - `Assets/*.png` — tile/splash logos (blue + gold Twinkie bar; on GitHub Actions they are generated at build time by `Assets/generate-logos.py`, since the upload path carries text files only).
 - `Build-UWP.ps1` — one-command Windows build (see Option B).
@@ -39,7 +39,7 @@ fake package. Either build path below produces the real, installable
    `DobsonGame/`).
 3. When it finishes, download the **DobsonGame-Xbox** artifact and unzip
    it. You'll get two files from the *same* build — keep them together:
-   - `DobsonGame_1.84.0.0_x64.msixbundle` (the game)
+   - `DobsonGame_1.93.0.0_x64.msixbundle` (the game)
    - `DobsonGame.cer` (its test certificate)
 
 ## Option B — build on a Windows PC with Visual Studio
@@ -84,7 +84,7 @@ Alternative from a Windows PC with the Windows SDK installed:
 
 1. Copy the new `index.html` over `DobsonGame/Assets/game/index.html`.
 2. Bump `Version` in `DobsonGame/Package.appxmanifest`
-   (e.g. `1.84.0.0` → `1.85.0.0`) — Xbox only installs a *higher*
+   (e.g. `1.93.0.0` → `1.94.0.0`) — Xbox only installs a *higher*
    version over the old one.
 3. Rebuild (Option A or B) and install over the existing app.
    Updating this way keeps the app's saved data, so high scores,
@@ -93,7 +93,7 @@ Alternative from a Windows PC with the Windows SDK installed:
 **Xbox WebView note (2026-10-28):** the Xbox app runs the older EdgeHTML
 browser, which cannot parse `?.` optional chaining — that was why the
 first install showed only a dark screen. The copy of the game in
-`DobsonGame/Assets/game/index.html` has those 4 expressions replaced
+`DobsonGame/Assets/game/index.html` has those 3 expressions replaced
 with plain if-guards (same behaviour, no version change). If a future
 game version reintroduces `?.`, re-apply the same replacement to the
 Xbox copy before building, or the Xbox build will break again.
@@ -106,7 +106,7 @@ request so B never kicks the player to the Xbox menu mid-game. If a
 future game version replaces `DobsonGame/Assets/game/index.html`,
 re-apply both the EdgeHTML and the controller patches to the new copy.
 
-**Couples Therapy on Xbox (v85):** the Xbox build includes the new
+**Couples Therapy on Xbox (v93):** the Xbox build includes the new
 Couples Therapy mode from the main menu. Connect a second controller
 and the battle starts automatically — two players on one TV, no split
 screen: the camera follows the midpoint between Mr. Dobson and
@@ -115,8 +115,13 @@ Jump: A, Throw: RT, Quit: B. Win condition is selectable on the
 waiting screen with the D-pad: best of 3 rounds, or most hits in
 1 minute (a tie goes to sudden death — next hit wins). Only thrown
 Twinkies damage the other player (spikes only knock you back, falling in a gap
-just respawns you). The packaged manifest is still 1.84.0.0, so
-install the v85 bundle after uninstalling the old Xbox app.
+just respawns you). This build has the v91–v93 battle improvements:
+lobbed throws with a visible arc, green Twinkies (40 damage), real floor
+gaps (a fall respawns you at your original spot with HP kept), hits knock
+you back without changing which way you face, a 1-second delay between
+throws, and Mrs. Dobson's run animation. The packaged manifest is
+1.93.0.0, so the v93 bundle installs over the old Xbox app with no
+uninstall needed.
 
 ## Notes and limits (honest ones)
 
